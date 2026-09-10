@@ -175,6 +175,50 @@ const DISEASE_SYMPTOM_MAP: Record<string, {
   "Dengue Fever": {
     symptoms: ["high fever", "severe headache", "pain behind eyes", "joint pain", "muscle pain", "rash", "bleeding", "nausea"],
     specialization: "General Physician", description: "Mosquito-borne viral infection", urgency: "high", bodyPart: "general"
+  },
+  "Typhoid": {
+    symptoms: ["prolonged fever", "abdominal pain", "headache", "fatigue", "loss of appetite", "rose spots", "constipation", "diarrhea", "weakness"],
+    specialization: "General Physician", description: "Bacterial infection caused by Salmonella typhi", urgency: "high", bodyPart: "abdomen"
+  },
+  "Malaria": {
+    symptoms: ["cyclical fever", "chills", "sweating", "headache", "nausea", "vomiting", "muscle pain", "fatigue", "anemia"],
+    specialization: "General Physician", description: "Mosquito-borne parasitic infection", urgency: "high", bodyPart: "general"
+  },
+  "Kidney Stones": {
+    symptoms: ["severe flank pain", "pain radiating to groin", "blood in urine", "nausea", "vomiting", "frequent urination", "burning urination"],
+    specialization: "General Physician", description: "Solid mineral deposits in kidneys causing pain", urgency: "high", bodyPart: "abdomen"
+  },
+  "Appendicitis": {
+    symptoms: ["right lower abdominal pain", "nausea", "vomiting", "fever", "loss of appetite", "tenderness", "rebound tenderness"],
+    specialization: "General Physician", description: "Inflammation of the appendix — requires emergency surgery", urgency: "emergency", bodyPart: "abdomen"
+  },
+  "Glaucoma": {
+    symptoms: ["eye pain", "blurred vision", "headache", "nausea", "rainbow halos", "vision loss", "eye redness"],
+    specialization: "Ophthalmologist", description: "Eye condition damaging the optic nerve", urgency: "high", bodyPart: "head"
+  },
+  "Cataracts": {
+    symptoms: ["blurred vision", "faded colors", "glare sensitivity", "double vision", "frequent prescription changes", "night vision difficulty"],
+    specialization: "Ophthalmologist", description: "Clouding of the eye's natural lens", urgency: "low", bodyPart: "head"
+  },
+  "Anemia": {
+    symptoms: ["fatigue", "weakness", "pale skin", "shortness of breath", "dizziness", "cold hands", "chest pain", "headache", "brittle nails"],
+    specialization: "General Physician", description: "Low red blood cell count reducing oxygen delivery", urgency: "moderate", bodyPart: "general"
+  },
+  "Anxiety Disorder": {
+    symptoms: ["excessive worry", "restlessness", "fatigue", "difficulty concentrating", "muscle tension", "sleep problems", "palpitations", "sweating"],
+    specialization: "Psychiatrist", description: "Mental health condition causing excessive anxiety", urgency: "moderate", bodyPart: "general"
+  },
+  "Depression": {
+    symptoms: ["persistent sadness", "loss of interest", "fatigue", "sleep changes", "appetite changes", "difficulty concentrating", "feelings of worthlessness", "hopelessness"],
+    specialization: "Psychiatrist", description: "Mental health condition affecting mood and daily function", urgency: "moderate", bodyPart: "general"
+  },
+  "Sleep Apnea": {
+    symptoms: ["loud snoring", "gasping during sleep", "morning headache", "excessive daytime sleepiness", "dry mouth", "difficulty concentrating", "mood changes"],
+    specialization: "Pulmonologist", description: "Sleep disorder causing repeated breathing interruptions", urgency: "moderate", bodyPart: "chest"
+  },
+  "Gallstones": {
+    symptoms: ["upper right abdominal pain", "pain after fatty meal", "nausea", "vomiting", "back pain between shoulders", "jaundice", "fever"],
+    specialization: "Gastroenterologist", description: "Hard deposits in the gallbladder", urgency: "moderate", bodyPart: "abdomen"
   }
 }
 
@@ -189,48 +233,68 @@ function analyzeSymptoms(symptoms: string[], bodyPart?: string): {
   for (const [disease, data] of Object.entries(DISEASE_SYMPTOM_MAP)) {
     let score = 0
     const diseaseSymptoms = data.symptoms.map(s => s.toLowerCase())
+    let exactMatches = 0
+    let partialMatches = 0
 
     for (const symptom of normalizedSymptoms) {
       for (const ds of diseaseSymptoms) {
-        if (ds.includes(symptom) || symptom.includes(ds)) {
-          score += 2
-        } else if (symptom.split(' ').some(word => ds.includes(word) && word.length > 3)) {
-          score += 1
+        if (ds === symptom) {
+          score += 4; exactMatches++  // exact match — strongest signal
+        } else if (ds.includes(symptom) || symptom.includes(ds)) {
+          score += 2.5; exactMatches++  // substring match — strong
+        } else {
+          // Word-level partial match
+          const sWords = symptom.split(' ').filter(w => w.length > 3)
+          const dsWords = ds.split(' ').filter(w => w.length > 3)
+          const wordOverlap = sWords.filter(w => dsWords.some(dw => dw.includes(w) || w.includes(dw))).length
+          if (wordOverlap > 0) {
+            score += wordOverlap * 1.2; partialMatches++
+          }
         }
       }
     }
 
-    // Body part bonus
+    // Penalize if very few symptoms match (avoid false positives)
+    const matchRatio = exactMatches / Math.max(normalizedSymptoms.length, 1)
+    if (matchRatio < 0.2 && partialMatches === 0) {
+      score = 0  // Too few matches — discard
+    }
+
+    // Body part bonus — significant boost when body part matches
     if (bodyPart && data.bodyPart) {
       const bodyPartMap: Record<string, string[]> = {
-        'head': ['head', 'brain', 'face'],
-        'chest': ['chest', 'heart', 'lungs'],
-        'abdomen': ['abdomen', 'stomach', 'liver'],
-        'back': ['back', 'spine'],
-        'limbs': ['arm', 'leg', 'limbs', 'joints'],
-        'skin': ['skin'],
-        'neck': ['neck', 'throat'],
+        'head': ['head', 'brain', 'face', 'eye', 'ear'],
+        'neck': ['neck', 'throat', 'thyroid'],
+        'chest': ['chest', 'heart', 'lungs', 'breast'],
+        'abdomen': ['abdomen', 'stomach', 'liver', 'pelvis', 'kidney'],
+        'back': ['back', 'spine', 'lumbar'],
+        'arm': ['arm', 'limbs', 'elbow', 'wrist', 'shoulder'],
+        'leg': ['leg', 'limbs', 'knee', 'ankle', 'foot'],
+        'pelvis': ['pelvis', 'abdomen', 'reproductive'],
+        'skin': ['skin', 'general'],
         'general': ['general']
       }
+      const bpLower = bodyPart.toLowerCase()
       for (const [bpKey, bpAliases] of Object.entries(bodyPartMap)) {
-        if (bpAliases.some(a => bodyPart.toLowerCase().includes(a))) {
-          if (data.bodyPart === bpKey || bpAliases.some(a => data.bodyPart === a)) {
-            score += 3
+        if (bpAliases.some(a => bpLower.includes(a) || a.includes(bpLower))) {
+          if (data.bodyPart === bpKey || bpAliases.some(a => data.bodyPart?.includes(a))) {
+            score += 5  // Strong body-part boost
           }
         }
       }
     }
 
     if (score > 0) {
-      const maxPossible = Math.min(normalizedSymptoms.length, data.symptoms.length) * 2
-      scores[disease] = Math.min(95, Math.round((score / Math.max(maxPossible, 4)) * 100))
+      const maxPossible = Math.min(normalizedSymptoms.length, data.symptoms.length) * 4
+      const rawPercent = Math.min(97, Math.round((score / Math.max(maxPossible, 4)) * 110))
+      scores[disease] = Math.max(20, rawPercent)  // Floor at 20 if there's any match
     }
   }
 
   const sorted = Object.entries(scores)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
-    .filter(([, score]) => score > 15)
+    .filter(([, score]) => score >= 25)
 
   const predictions = sorted.map(([disease, confidence]) => ({
     disease,
@@ -758,6 +822,352 @@ app.get('/api/nearby/hospitals', async (c) => {
   ]
 
   return c.json({ success: true, hospitals, scanCentres, pharmacies, location: { lat, lng, city } })
+})
+
+// ─── MEDICAL REPORTS ROUTES ──────────────────────────────────────────────────
+app.get('/api/reports', async (c) => {
+  try {
+    const token = c.req.header('X-Session-Token')
+    const session = await getSession(c.env.DB, token || '')
+    if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+
+    let results
+    if (session.user_type === 'patient') {
+      const q = await c.env.DB.prepare(`
+        SELECT r.*, d.name as doctor_name, d.specialization
+        FROM medical_reports r
+        LEFT JOIN doctors d ON r.doctor_id = d.id
+        WHERE r.patient_id = ?
+        ORDER BY r.report_date DESC
+      `).bind(session.user_id).all()
+      results = q.results
+    } else {
+      const q = await c.env.DB.prepare(`
+        SELECT r.*, p.name as patient_name, p.phone as patient_phone
+        FROM medical_reports r
+        JOIN patients p ON r.patient_id = p.id
+        WHERE r.doctor_id = ?
+        ORDER BY r.created_at DESC
+      `).bind(session.user_id).all()
+      results = q.results
+    }
+
+    const reports = results.map((r: any) => ({
+      ...r,
+      tags: JSON.parse(r.tags || '[]')
+    }))
+
+    return c.json({ success: true, reports })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+app.post('/api/reports', async (c) => {
+  try {
+    const token = c.req.header('X-Session-Token')
+    const session = await getSession(c.env.DB, token || '')
+    if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+
+    const body = await c.req.json()
+    const { report_type, report_title, report_date, description, findings,
+            file_url, file_name, lab_name, patient_id, appointment_id, is_critical, tags } = body
+
+    if (!report_title || !report_type) return c.json({ success: false, error: 'Title and type required' }, 400)
+
+    const reportId = generateId('RPT').toUpperCase().substring(0, 14)
+    const pId = session.user_type === 'patient' ? session.user_id : (patient_id || '')
+    const dId = session.user_type === 'doctor' ? session.user_id : null
+
+    if (!pId) return c.json({ success: false, error: 'Patient ID required' }, 400)
+
+    await c.env.DB.prepare(`
+      INSERT INTO medical_reports
+        (report_id, patient_id, doctor_id, appointment_id, report_type, report_title, report_date,
+         description, findings, file_url, file_name, lab_name, is_critical, tags, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')
+    `).bind(
+      reportId, pId, dId, appointment_id || null,
+      report_type, report_title, report_date || new Date().toISOString().split('T')[0],
+      description || '', findings || '', file_url || '', file_name || '',
+      lab_name || '', is_critical ? 1 : 0, JSON.stringify(tags || [])
+    ).run()
+
+    return c.json({ success: true, report_id: reportId, message: 'Report saved successfully' })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+app.delete('/api/reports/:id', async (c) => {
+  try {
+    const token = c.req.header('X-Session-Token')
+    const session = await getSession(c.env.DB, token || '')
+    if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+    const id = c.req.param('id')
+    await c.env.DB.prepare('DELETE FROM medical_reports WHERE id = ? AND patient_id = ?').bind(id, session.user_id).run()
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// ─── PRESCRIPTION ROUTES ──────────────────────────────────────────────────────
+app.get('/api/prescriptions', async (c) => {
+  try {
+    const token = c.req.header('X-Session-Token')
+    const session = await getSession(c.env.DB, token || '')
+    if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+
+    let results
+    if (session.user_type === 'patient') {
+      const q = await c.env.DB.prepare(`
+        SELECT p.*, d.name as doctor_name, d.specialization, d.hospital_name
+        FROM prescriptions p
+        JOIN doctors d ON p.doctor_id = d.id
+        WHERE p.patient_id = ? AND p.is_active = 1
+        ORDER BY p.created_at DESC
+      `).bind(session.user_id).all()
+      results = q.results
+    } else {
+      const q = await c.env.DB.prepare(`
+        SELECT p.*, pt.name as patient_name, pt.phone as patient_phone
+        FROM prescriptions p
+        JOIN patients pt ON p.patient_id = pt.id
+        WHERE p.doctor_id = ?
+        ORDER BY p.created_at DESC
+      `).bind(session.user_id).all()
+      results = q.results
+    }
+
+    const prescriptions = results.map((p: any) => ({
+      ...p,
+      medicines: JSON.parse(p.medicines || '[]')
+    }))
+
+    return c.json({ success: true, prescriptions })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+app.post('/api/prescriptions', async (c) => {
+  try {
+    const token = c.req.header('X-Session-Token')
+    const session = await getSession(c.env.DB, token || '')
+    if (!session || session.user_type !== 'doctor') return c.json({ success: false, error: 'Unauthorized - Doctor only' }, 401)
+
+    const body = await c.req.json()
+    const { patient_id, appointment_id, diagnosis, medicines, instructions, valid_till, notes } = body
+
+    if (!patient_id || !medicines || !Array.isArray(medicines) || medicines.length === 0) {
+      return c.json({ success: false, error: 'Patient ID and medicines required' }, 400)
+    }
+
+    const prescriptionId = generateId('RX').toUpperCase().substring(0, 12)
+
+    await c.env.DB.prepare(`
+      INSERT INTO prescriptions
+        (prescription_id, patient_id, doctor_id, appointment_id, diagnosis, medicines, instructions, valid_till, notes, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `).bind(
+      prescriptionId, patient_id, session.user_id, appointment_id || null,
+      diagnosis || '', JSON.stringify(medicines),
+      instructions || '', valid_till || '', notes || ''
+    ).run()
+
+    const prescription = await c.env.DB.prepare('SELECT * FROM prescriptions WHERE prescription_id = ?').bind(prescriptionId).first() as any
+
+    // Create reminders for each medicine
+    for (const med of medicines) {
+      const reminderId = generateId('REM').substring(0, 16)
+      const times = med.timing === 'morning' ? ['08:00'] :
+                    med.timing === 'evening' ? ['18:00'] :
+                    med.timing === 'night' ? ['21:00'] :
+                    med.timing === 'twice' ? ['08:00', '20:00'] :
+                    ['08:00', '14:00', '21:00']
+
+      await c.env.DB.prepare(`
+        INSERT INTO medication_reminders
+          (reminder_id, patient_id, prescription_id, medicine_name, dosage, frequency, times, start_date, end_date, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, date('now'), ?, 1)
+      `).bind(
+        reminderId, patient_id, prescription.id, med.name, med.dosage || '',
+        med.frequency || 'daily', JSON.stringify(times),
+        valid_till || ''
+      ).run()
+    }
+
+    return c.json({ success: true, prescription_id: prescriptionId, message: 'Prescription created and reminders set' })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// ─── REMINDER ROUTES ──────────────────────────────────────────────────────────
+app.get('/api/reminders', async (c) => {
+  try {
+    const token = c.req.header('X-Session-Token')
+    const session = await getSession(c.env.DB, token || '')
+    if (!session || session.user_type !== 'patient') return c.json({ success: false, error: 'Unauthorized' }, 401)
+
+    const { results } = await c.env.DB.prepare(`
+      SELECT r.*, p.prescription_id, p.diagnosis, d.name as doctor_name
+      FROM medication_reminders r
+      JOIN prescriptions p ON r.prescription_id = p.id
+      JOIN doctors d ON p.doctor_id = d.id
+      WHERE r.patient_id = ? AND r.is_active = 1
+      ORDER BY r.created_at DESC
+    `).bind(session.user_id).all()
+
+    const reminders = results.map((r: any) => ({
+      ...r,
+      times: JSON.parse(r.times || '[]')
+    }))
+
+    return c.json({ success: true, reminders })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+app.put('/api/reminders/:id/toggle', async (c) => {
+  try {
+    const token = c.req.header('X-Session-Token')
+    const session = await getSession(c.env.DB, token || '')
+    if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+
+    const id = c.req.param('id')
+    const { is_active } = await c.req.json()
+
+    await c.env.DB.prepare('UPDATE medication_reminders SET is_active = ? WHERE id = ? AND patient_id = ?')
+      .bind(is_active ? 1 : 0, id, session.user_id).run()
+
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// ─── AI CHATBOT ROUTE ─────────────────────────────────────────────────────────
+const CHAT_KNOWLEDGE_BASE: Record<string, string[]> = {
+  // Platform Navigation
+  'book appointment': ['To book an appointment: 1) Go to "Find Doctors" page, 2) Search for your required specialist, 3) Click "Book Appointment" on the doctor card, 4) Choose date and time slot, 5) Confirm booking. You\'ll receive a confirmation. Alternatively, use AI Symptom Checker to get doctor recommendations first.'],
+  'find doctor': ['To find a doctor: Click "Find Doctors" in the navigation menu. You can filter by specialization (Cardiologist, Neurologist, etc.), city, or search by name. You can also use the AI Symptom Checker to get matched with the right specialist based on your symptoms.'],
+  'cancel appointment': ['To cancel an appointment: Go to "My Appointments" page, find the appointment you want to cancel, and click the "Cancel" button. Please try to cancel at least 24 hours in advance as a courtesy to the doctor.'],
+  'my reports': ['To view your medical reports: Go to your Dashboard and click "My Reports" tab. You can see all your reports, prescriptions, and medical history. Doctors can also upload reports directly to your profile after consultation.'],
+  'reminder': ['Medication reminders are set automatically when your doctor prescribes medicines. Go to Dashboard → "Medications" tab to see all your active reminders. You can enable/disable individual reminders and the app will notify you at the scheduled times.'],
+  'prescription': ['Your prescriptions are visible in Dashboard → "Medications" tab. When a doctor issues a prescription, medication reminders are automatically created. You can also show your prescription to pharmacies directly from the app.'],
+  'ai checker': ['The AI Symptom Checker is our most powerful feature! Go to "AI Checker" page, select the affected body part on the interactive diagram, add your symptoms, and click "Analyze". Our AI will predict possible conditions and recommend the right specialist. Always consult a real doctor for diagnosis.'],
+  'nearby': ['To find nearby services: Go to "Nearby" page and allow location access. We\'ll show hospitals, diagnostic centres, and pharmacies near you with distance, ratings, and contact info. Emergency services are highlighted with a red badge.'],
+  
+  // Medical Information
+  'fever': ['Fever (temperature above 100.4°F/38°C) can indicate infection, flu, or other conditions. For adults: rest, hydrate, take paracetamol for discomfort. See a doctor if fever exceeds 103°F, lasts more than 3 days, or is accompanied by severe symptoms. For children, consult a doctor immediately.'],
+  'headache': ['Headaches can be caused by tension, dehydration, migraine, sinusitis, or rarely serious conditions. Try: hydration, rest in dark quiet room, over-the-counter pain relief. See a neurologist if headaches are severe, sudden (thunderclap), recurring, or with vision/speech changes.'],
+  'chest pain': ['⚠️ IMPORTANT: Chest pain can indicate serious heart conditions. If you have sudden severe chest pain, especially with arm/jaw pain, sweating, and shortness of breath — call emergency services immediately (102/112 in India). For non-emergency chest pain, book a Cardiologist consultation.'],
+  'diabetes': ['Diabetes symptoms: frequent urination, excessive thirst, unexplained weight loss, fatigue, blurred vision. Type 2 diabetes is manageable with lifestyle changes and medication. See an Endocrinologist for proper diagnosis and treatment plan. Monitor blood sugar regularly.'],
+  'blood pressure': ['High BP (hypertension) often has no symptoms but increases risk of heart attack and stroke. Normal: below 120/80. High: above 140/90. Take BP medications regularly if prescribed, reduce salt intake, exercise, avoid stress. See a Cardiologist for management.'],
+  'cough': ['Common causes: viral infection, asthma, allergies, acid reflux, or medication side effects. See a Pulmonologist if: cough lasts more than 3 weeks, has blood, causes breathing difficulty, or is accompanied by fever and chest pain.'],
+  'back pain': ['Most back pain improves with rest, gentle stretching, and over-the-counter pain relief. See an Orthopedic specialist if: pain radiates to legs, is accompanied by numbness/weakness, follows injury, is severe, or doesn\'t improve in 2 weeks.'],
+  'skin': ['For skin conditions like rashes, eczema, psoriasis, or suspicious moles, consult a Dermatologist. Avoid self-diagnosing skin conditions as they can have many causes. Our AI Checker can help narrow down possibilities based on your specific symptoms.'],
+  'stomach': ['Stomach/abdominal pain can range from indigestion to serious conditions. Mild stomach pain: try antacids, avoid spicy food, stay hydrated. See a Gastroenterologist if: pain is severe, persistent (>2 days), with vomiting blood, or with significant weight loss.'],
+  'heart': ['Heart health is crucial. Warning signs: chest pain, shortness of breath, irregular heartbeat, swelling in legs. Risk factors: hypertension, diabetes, high cholesterol, smoking, obesity. Regular check-ups with a Cardiologist are recommended after age 40 or if you have risk factors.'],
+  'mental health': ['Mental health is as important as physical health. Common conditions: anxiety, depression, stress. Symptoms: persistent sadness, anxiety, sleep changes, appetite changes. A Psychiatrist or Psychologist can help. Don\'t hesitate to seek help — mental health treatment is very effective.'],
+  
+  // Emergencies
+  'emergency': ['For medical emergencies in India: Call 102 (Ambulance), 108 (Emergency), or 112 (National Emergency). Go to the nearest emergency hospital immediately. Use the "Nearby" feature to find the closest hospital with emergency services. Don\'t wait — time is critical in emergencies.'],
+  'heart attack': ['⚠️ EMERGENCY: Heart attack symptoms: severe chest pain/pressure, pain spreading to arm/jaw/neck, shortness of breath, cold sweats, nausea. CALL 102 IMMEDIATELY. While waiting: chew aspirin (if not allergic), sit/lie down, stay calm. Don\'t drive yourself to the hospital.'],
+  'stroke': ['⚠️ EMERGENCY STROKE SIGNS - Remember FAST: Face drooping, Arm weakness, Speech difficulty, Time to call 102. Time is critical — every minute counts. Don\'t wait to see if symptoms improve. Brain damage occurs rapidly without treatment.'],
+  
+  // General
+  'hello': ['Hello! 👋 I\'m MedBot, your AI health assistant at MyDoctor\'s. I can help you: 🔍 Navigate the platform, 📅 Understand how to book appointments, 💊 Learn about medications and reminders, 🩺 Get general health information, 🏥 Find nearby medical services. How can I help you today?'],
+  'hi': ['Hi there! 👋 I\'m MedBot. How can I help you today? You can ask me about health conditions, how to use MyDoctor\'s features, or finding the right specialist for your symptoms.'],
+  'help': ['I can help with: \n1. 🏥 Platform navigation (booking, reports, prescriptions)\n2. 💊 Medication reminders and prescriptions\n3. 🩺 General health information\n4. 🚨 Emergency guidance\n5. 👨‍⚕️ Finding the right specialist\n\nJust type your question naturally!'],
+  'thanks': ['You\'re welcome! 😊 Stay healthy! If you need anything else, I\'m here. Remember — for accurate medical advice, always consult a qualified doctor on our platform.'],
+  'thank you': ['Happy to help! 💙 Your health is our priority. Don\'t hesitate to use the AI Symptom Checker or book an appointment with one of our verified doctors.'],
+  'bye': ['Take care! 👋 Remember to take your medications on time and stay hydrated. See you next time! 🏥'],
+  'specialist': ['Choosing the right specialist: \n• Heart issues → Cardiologist\n• Brain/nerves → Neurologist\n• Skin → Dermatologist\n• Bones/joints → Orthopedic\n• Women\'s health → Gynecologist\n• Lungs → Pulmonologist\n• Hormones/diabetes → Endocrinologist\n• Stomach/liver → Gastroenterologist\n\nNot sure? Use our AI Symptom Checker!'],
+  'cost': ['Consultation fees vary by specialist and experience. Our platform shows the fee on each doctor\'s profile. Government hospital consultations are subsidized. You can filter doctors by fee range in the search. Use the AI Symptom Checker to avoid unnecessary specialist consultations.'],
+  'profile': ['To update your profile: Click your name/avatar in the navigation bar → Profile. You can update contact info, medical history, allergies, current medications, and profile photo. Keeping your medical history updated helps doctors provide better care.'],
+  'login': ['To login: Click "Login" in the top navigation. Choose "Patient" or "Doctor", enter your email and password. If you\'re new, click "Sign Up" to create a free account. Having trouble? Try resetting your password or contact support.'],
+  'register': ['To register: Click "Login" → "Sign Up" → Select "Patient" or "Doctor". Fill in your details. Doctors need to provide their specialization and qualifications. Registration is free for patients. Your account will be active immediately.'],
+  'doctor': ['Our doctors are verified medical professionals across various specializations. You can view their qualifications, experience, hospital affiliation, consultation fee, and patient reviews. Book appointments directly through the platform. Use the AI Checker to find the right specialist.']
+}
+
+function generateChatResponse(message: string): string {
+  const lower = message.toLowerCase().trim()
+  
+  // Direct keyword matching
+  for (const [keyword, responses] of Object.entries(CHAT_KNOWLEDGE_BASE)) {
+    if (lower.includes(keyword)) {
+      return responses[Math.floor(Math.random() * responses.length)]
+    }
+  }
+  
+  // Symptom keywords  
+  const symptomWords = ['pain', 'ache', 'hurt', 'sore', 'burning', 'swelling', 'bleed', 'dizzy', 'nausea', 'vomit', 'tired', 'fatigue', 'rash', 'itch', 'fever', 'cough', 'breathe', 'palpitation', 'numbness']
+  const hasSymptom = symptomWords.some(w => lower.includes(w))
+  if (hasSymptom) {
+    return '🩺 It sounds like you might be experiencing some symptoms. I\'d recommend using our **AI Symptom Checker** for a more accurate assessment — it can analyze your symptoms and suggest the right specialist.\n\nFor immediate concerns, click "AI Checker" in the navigation menu and enter your symptoms. Would you like me to explain how to use it?'
+  }
+  
+  // Doctor-related
+  if (lower.includes('doc') || lower.includes('physician') || lower.includes('consult') || lower.includes('appoint')) {
+    return '👨‍⚕️ Looking for a doctor? You can:\n1. Go to **"Find Doctors"** and search by specialization or name\n2. Use **AI Symptom Checker** to get matched with the right specialist\n3. Browse by specialty in the navigation\n\nAll our doctors are verified professionals. Would you like help finding a specific type of specialist?'
+  }
+  
+  // Medication-related
+  if (lower.includes('medicine') || lower.includes('tablet') || lower.includes('drug') || lower.includes('medication') || lower.includes('dose') || lower.includes('pill')) {
+    return '💊 For medication information:\n• Your **prescribed medicines** are in Dashboard → Medications tab\n• **Reminders** are set automatically when doctor prescribes\n• Never self-medicate without doctor advice\n• For drug interactions, consult your doctor or pharmacist\n\nDo you need help finding your prescription or setting up reminders?'
+  }
+  
+  // Location/nearby
+  if (lower.includes('hospital') || lower.includes('clinic') || lower.includes('pharmacy') || lower.includes('lab') || lower.includes('near') || lower.includes('scan')) {
+    return '🏥 To find nearby medical services, go to the **"Nearby"** page. Allow location access and we\'ll show you:\n• Hospitals (with emergency info)\n• Diagnostic centres & labs\n• Pharmacies\n\nAll listings include distance, ratings, and contact numbers.'
+  }
+  
+  // Default intelligent fallback
+  const fallbacks = [
+    'I\'m not sure about that specific query. Could you rephrase it? I can help with:\n• 🔍 Finding doctors and booking appointments\n• 💊 Medications and reminders\n• 🩺 General health information\n• 🏥 Nearby hospitals and services',
+    'That\'s an interesting question! For accurate medical advice, I recommend consulting one of our verified doctors. I can help you book an appointment or use the AI Symptom Checker to find the right specialist.',
+    'I\'m still learning! For specific medical questions, please use the **AI Symptom Checker** or consult a doctor on our platform. I\'m best at helping you navigate MyDoctor\'s features. What else can I help with?',
+  ]
+  return fallbacks[Math.floor(Math.random() * fallbacks.length)]
+}
+
+app.post('/api/chat', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { message, session_id } = body
+
+    if (!message || !message.trim()) {
+      return c.json({ success: false, error: 'Message required' }, 400)
+    }
+
+    const token = c.req.header('X-Session-Token')
+    const authSession = token ? await getSession(c.env.DB, token) : null
+    const chatSessionId = session_id || generateId('chat')
+
+    // Store user message
+    try {
+      await c.env.DB.prepare(
+        'INSERT INTO chat_messages (session_id, user_id, role, content) VALUES (?, ?, ?, ?)'
+      ).bind(chatSessionId, authSession ? String(authSession.user_id) : 'anonymous', 'user', message).run()
+    } catch (e) { /* non-critical */ }
+
+    const reply = generateChatResponse(message)
+
+    // Store bot reply
+    try {
+      await c.env.DB.prepare(
+        'INSERT INTO chat_messages (session_id, user_id, role, content) VALUES (?, ?, ?, ?)'
+      ).bind(chatSessionId, 'medbot', 'assistant', reply).run()
+    } catch (e) { /* non-critical */ }
+
+    return c.json({ success: true, reply, session_id: chatSessionId })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
 })
 
 // ─── STATIC FILES ─────────────────────────────────────────────────────────────
@@ -1545,6 +1955,63 @@ app.get('*', (c) => {
 </footer>
 
 <script src="/static/app.js"></script>
+
+<!-- ═══════════════ AI CHATBOT WIDGET ═══════════════ -->
+<div id="chatbotWidget" class="chatbot-widget">
+  <!-- Floating Button -->
+  <button class="chatbot-toggle" id="chatbotToggle" onclick="toggleChatbot()" title="Ask MedBot">
+    <i class="fas fa-robot chatbot-open-icon"></i>
+    <i class="fas fa-times chatbot-close-icon" style="display:none"></i>
+    <span class="chatbot-badge" id="chatBadge" style="display:none">1</span>
+  </button>
+
+  <!-- Chat Window -->
+  <div class="chatbot-window" id="chatbotWindow">
+    <div class="chatbot-header">
+      <div class="chatbot-avatar">
+        <i class="fas fa-robot"></i>
+        <span class="chatbot-status-dot"></span>
+      </div>
+      <div class="chatbot-info">
+        <h4>MedBot</h4>
+        <span>AI Health Assistant • Always Online</span>
+      </div>
+      <button class="chatbot-minimize" onclick="toggleChatbot()"><i class="fas fa-chevron-down"></i></button>
+    </div>
+
+    <div class="chatbot-messages" id="chatbotMessages">
+      <div class="chat-msg bot">
+        <div class="chat-avatar"><i class="fas fa-robot"></i></div>
+        <div class="chat-bubble">
+          👋 Hi! I'm <strong>MedBot</strong>, your AI health assistant.<br><br>
+          I can help you with:<br>
+          • 🩺 Health questions &amp; symptoms<br>
+          • 📅 Booking appointments<br>
+          • 💊 Medications &amp; reminders<br>
+          • 🏥 Finding nearby services<br><br>
+          How can I help you today?
+        </div>
+      </div>
+      <div class="chat-quick-replies" id="quickReplies">
+        <button onclick="sendQuickReply('How do I book an appointment?')">📅 Book appointment</button>
+        <button onclick="sendQuickReply('How does AI Checker work?')">🤖 AI Symptom Checker</button>
+        <button onclick="sendQuickReply('Show me emergency contacts')">🚨 Emergency</button>
+        <button onclick="sendQuickReply('How do I view my reports?')">📋 My Reports</button>
+      </div>
+    </div>
+
+    <div class="chatbot-input-area">
+      <div class="chatbot-input-wrap">
+        <input type="text" id="chatInput" placeholder="Type your health question..." 
+               onkeydown="if(event.key==='Enter') sendChatMessage()">
+        <button onclick="sendChatMessage()" class="chat-send-btn" id="chatSendBtn">
+          <i class="fas fa-paper-plane"></i>
+        </button>
+      </div>
+      <p class="chat-disclaimer">For emergencies, call 102 | Not a substitute for medical advice</p>
+    </div>
+  </div>
+</div>
 </body>
 </html>`)
 })
