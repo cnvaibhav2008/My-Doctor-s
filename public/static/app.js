@@ -1676,7 +1676,8 @@ async function requestNotificationPermission() {
 const chatState = {
   isOpen: false,
   sessionId: null,
-  isTyping: false
+  isTyping: false,
+  history: []   // local conversation history for context
 };
 
 function toggleChatbot() {
@@ -1696,20 +1697,44 @@ function sendQuickReply(text) {
   sendChatMessage();
 }
 
+/**
+ * Convert basic markdown-like syntax to HTML for chat bubbles.
+ * Handles: **bold**, *italic*, bullet lines (•), newlines, numbered lists
+ */
+function formatChatMarkdown(text) {
+  return text
+    // Bold
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    // Italic
+    .replace(/\*((?!\*)[^*]+)\*/g, '<em>$1</em>')
+    // Bullet points: lines starting with •
+    .replace(/^• (.+)$/gm, '<li>$1</li>')
+    // Numbered list: lines starting with 1. 2. etc.
+    .replace(/^\d+\.\s(.+)$/gm, '<li>$1</li>')
+    // Wrap consecutive <li> in <ul>
+    .replace(/(<li>.*<\/li>(\n)?)+/gs, (m) => `<ul>${m}</ul>`)
+    // Newlines to <br>
+    .replace(/\n/g, '<br>')
+    // Clean up extra <br> inside lists
+    .replace(/<ul><br>/g, '<ul>')
+    .replace(/<\/ul><br>/g, '</ul>');
+}
+
 function appendChatMsg(role, content) {
   const msgs = $('chatbotMessages');
   const div = document.createElement('div');
   div.className = `chat-msg ${role}`;
 
-  // Convert markdown-like **bold** and newlines
-  const formatted = content
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n/g, '<br>');
+  const formatted = formatChatMarkdown(content);
 
   if (role === 'bot') {
-    div.innerHTML = `<div class="chat-avatar"><i class="fas fa-robot"></i></div><div class="chat-bubble">${formatted}</div>`;
+    div.innerHTML = `
+      <div class="chat-avatar"><i class="fas fa-robot"></i></div>
+      <div class="chat-bubble">${formatted}</div>`;
   } else {
-    div.innerHTML = `<div class="chat-bubble">${formatted}</div><div class="chat-avatar user"><i class="fas fa-user"></i></div>`;
+    div.innerHTML = `
+      <div class="chat-bubble">${formatted}</div>
+      <div class="chat-avatar user"><i class="fas fa-user"></i></div>`;
   }
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
@@ -1720,7 +1745,9 @@ function showTypingIndicator() {
   const div = document.createElement('div');
   div.className = 'chat-msg bot';
   div.id = 'typingIndicator';
-  div.innerHTML = `<div class="chat-avatar"><i class="fas fa-robot"></i></div><div class="chat-bubble typing"><span></span><span></span><span></span></div>`;
+  div.innerHTML = `
+    <div class="chat-avatar"><i class="fas fa-robot"></i></div>
+    <div class="chat-bubble typing"><span></span><span></span><span></span></div>`;
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
 }
@@ -1729,7 +1756,7 @@ function removeTypingIndicator() {
   $('typingIndicator')?.remove();
 }
 
-// Remove quick replies after first message
+// Remove quick replies after first real interaction
 function removeQuickReplies() {
   $('quickReplies')?.remove();
 }
@@ -1742,34 +1769,50 @@ async function sendChatMessage() {
 
   removeQuickReplies();
   appendChatMsg('user', msg);
+
+  // Add to local history
+  chatState.history.push({ role: 'user', content: msg });
+
   chatState.isTyping = true;
   $('chatSendBtn').disabled = true;
+  $('chatSendBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
   showTypingIndicator();
 
   try {
     const res = await apiCall('/api/chat', {
       method: 'POST',
-      body: JSON.stringify({ message: msg, session_id: chatState.sessionId })
+      body: JSON.stringify({
+        message: msg,
+        session_id: chatState.sessionId,
+        history: chatState.history.slice(-10)  // send last 10 turns for context
+      })
     });
 
     removeTypingIndicator();
 
     if (res.ok && res.data.success) {
       chatState.sessionId = res.data.session_id;
-      // Small delay for natural feel
-      await new Promise(r => setTimeout(r, 300));
-      appendChatMsg('bot', res.data.reply);
+      const reply = res.data.reply;
+
+      // Add bot reply to local history
+      chatState.history.push({ role: 'assistant', content: reply });
+
+      // Small natural delay
+      await new Promise(r => setTimeout(r, 180));
+      appendChatMsg('bot', reply);
     } else {
-      appendChatMsg('bot', "I'm having trouble connecting right now. Please try again in a moment.");
+      const errMsg = res.data?.error || "I'm having trouble right now. Please try again.";
+      appendChatMsg('bot', "⚠️ " + errMsg);
     }
   } catch (e) {
     removeTypingIndicator();
-    appendChatMsg('bot', "Network issue. Please check your connection.");
+    appendChatMsg('bot', '⚠️ Network issue. Please check your connection and try again.');
   }
 
   chatState.isTyping = false;
   $('chatSendBtn').disabled = false;
+  $('chatSendBtn').innerHTML = '<i class="fas fa-paper-plane"></i>';
   $('chatInput').focus();
 }
 

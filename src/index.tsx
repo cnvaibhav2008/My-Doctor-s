@@ -4,6 +4,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 
 type Bindings = {
   DB: D1Database
+  GEMINI_API_KEY: string
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -1049,96 +1050,149 @@ app.put('/api/reminders/:id/toggle', async (c) => {
   }
 })
 
-// ─── AI CHATBOT ROUTE ─────────────────────────────────────────────────────────
-const CHAT_KNOWLEDGE_BASE: Record<string, string[]> = {
-  // Platform Navigation
-  'book appointment': ['To book an appointment: 1) Go to "Find Doctors" page, 2) Search for your required specialist, 3) Click "Book Appointment" on the doctor card, 4) Choose date and time slot, 5) Confirm booking. You\'ll receive a confirmation. Alternatively, use AI Symptom Checker to get doctor recommendations first.'],
-  'find doctor': ['To find a doctor: Click "Find Doctors" in the navigation menu. You can filter by specialization (Cardiologist, Neurologist, etc.), city, or search by name. You can also use the AI Symptom Checker to get matched with the right specialist based on your symptoms.'],
-  'cancel appointment': ['To cancel an appointment: Go to "My Appointments" page, find the appointment you want to cancel, and click the "Cancel" button. Please try to cancel at least 24 hours in advance as a courtesy to the doctor.'],
-  'my reports': ['To view your medical reports: Go to your Dashboard and click "My Reports" tab. You can see all your reports, prescriptions, and medical history. Doctors can also upload reports directly to your profile after consultation.'],
-  'reminder': ['Medication reminders are set automatically when your doctor prescribes medicines. Go to Dashboard → "Medications" tab to see all your active reminders. You can enable/disable individual reminders and the app will notify you at the scheduled times.'],
-  'prescription': ['Your prescriptions are visible in Dashboard → "Medications" tab. When a doctor issues a prescription, medication reminders are automatically created. You can also show your prescription to pharmacies directly from the app.'],
-  'ai checker': ['The AI Symptom Checker is our most powerful feature! Go to "AI Checker" page, select the affected body part on the interactive diagram, add your symptoms, and click "Analyze". Our AI will predict possible conditions and recommend the right specialist. Always consult a real doctor for diagnosis.'],
-  'nearby': ['To find nearby services: Go to "Nearby" page and allow location access. We\'ll show hospitals, diagnostic centres, and pharmacies near you with distance, ratings, and contact info. Emergency services are highlighted with a red badge.'],
-  
-  // Medical Information
-  'fever': ['Fever (temperature above 100.4°F/38°C) can indicate infection, flu, or other conditions. For adults: rest, hydrate, take paracetamol for discomfort. See a doctor if fever exceeds 103°F, lasts more than 3 days, or is accompanied by severe symptoms. For children, consult a doctor immediately.'],
-  'headache': ['Headaches can be caused by tension, dehydration, migraine, sinusitis, or rarely serious conditions. Try: hydration, rest in dark quiet room, over-the-counter pain relief. See a neurologist if headaches are severe, sudden (thunderclap), recurring, or with vision/speech changes.'],
-  'chest pain': ['⚠️ IMPORTANT: Chest pain can indicate serious heart conditions. If you have sudden severe chest pain, especially with arm/jaw pain, sweating, and shortness of breath — call emergency services immediately (102/112 in India). For non-emergency chest pain, book a Cardiologist consultation.'],
-  'diabetes': ['Diabetes symptoms: frequent urination, excessive thirst, unexplained weight loss, fatigue, blurred vision. Type 2 diabetes is manageable with lifestyle changes and medication. See an Endocrinologist for proper diagnosis and treatment plan. Monitor blood sugar regularly.'],
-  'blood pressure': ['High BP (hypertension) often has no symptoms but increases risk of heart attack and stroke. Normal: below 120/80. High: above 140/90. Take BP medications regularly if prescribed, reduce salt intake, exercise, avoid stress. See a Cardiologist for management.'],
-  'cough': ['Common causes: viral infection, asthma, allergies, acid reflux, or medication side effects. See a Pulmonologist if: cough lasts more than 3 weeks, has blood, causes breathing difficulty, or is accompanied by fever and chest pain.'],
-  'back pain': ['Most back pain improves with rest, gentle stretching, and over-the-counter pain relief. See an Orthopedic specialist if: pain radiates to legs, is accompanied by numbness/weakness, follows injury, is severe, or doesn\'t improve in 2 weeks.'],
-  'skin': ['For skin conditions like rashes, eczema, psoriasis, or suspicious moles, consult a Dermatologist. Avoid self-diagnosing skin conditions as they can have many causes. Our AI Checker can help narrow down possibilities based on your specific symptoms.'],
-  'stomach': ['Stomach/abdominal pain can range from indigestion to serious conditions. Mild stomach pain: try antacids, avoid spicy food, stay hydrated. See a Gastroenterologist if: pain is severe, persistent (>2 days), with vomiting blood, or with significant weight loss.'],
-  'heart': ['Heart health is crucial. Warning signs: chest pain, shortness of breath, irregular heartbeat, swelling in legs. Risk factors: hypertension, diabetes, high cholesterol, smoking, obesity. Regular check-ups with a Cardiologist are recommended after age 40 or if you have risk factors.'],
-  'mental health': ['Mental health is as important as physical health. Common conditions: anxiety, depression, stress. Symptoms: persistent sadness, anxiety, sleep changes, appetite changes. A Psychiatrist or Psychologist can help. Don\'t hesitate to seek help — mental health treatment is very effective.'],
-  
-  // Emergencies
-  'emergency': ['For medical emergencies in India: Call 102 (Ambulance), 108 (Emergency), or 112 (National Emergency). Go to the nearest emergency hospital immediately. Use the "Nearby" feature to find the closest hospital with emergency services. Don\'t wait — time is critical in emergencies.'],
-  'heart attack': ['⚠️ EMERGENCY: Heart attack symptoms: severe chest pain/pressure, pain spreading to arm/jaw/neck, shortness of breath, cold sweats, nausea. CALL 102 IMMEDIATELY. While waiting: chew aspirin (if not allergic), sit/lie down, stay calm. Don\'t drive yourself to the hospital.'],
-  'stroke': ['⚠️ EMERGENCY STROKE SIGNS - Remember FAST: Face drooping, Arm weakness, Speech difficulty, Time to call 102. Time is critical — every minute counts. Don\'t wait to see if symptoms improve. Brain damage occurs rapidly without treatment.'],
-  
-  // General
-  'hello': ['Hello! 👋 I\'m MedBot, your AI health assistant at MyDoctor\'s. I can help you: 🔍 Navigate the platform, 📅 Understand how to book appointments, 💊 Learn about medications and reminders, 🩺 Get general health information, 🏥 Find nearby medical services. How can I help you today?'],
-  'hi': ['Hi there! 👋 I\'m MedBot. How can I help you today? You can ask me about health conditions, how to use MyDoctor\'s features, or finding the right specialist for your symptoms.'],
-  'help': ['I can help with: \n1. 🏥 Platform navigation (booking, reports, prescriptions)\n2. 💊 Medication reminders and prescriptions\n3. 🩺 General health information\n4. 🚨 Emergency guidance\n5. 👨‍⚕️ Finding the right specialist\n\nJust type your question naturally!'],
-  'thanks': ['You\'re welcome! 😊 Stay healthy! If you need anything else, I\'m here. Remember — for accurate medical advice, always consult a qualified doctor on our platform.'],
-  'thank you': ['Happy to help! 💙 Your health is our priority. Don\'t hesitate to use the AI Symptom Checker or book an appointment with one of our verified doctors.'],
-  'bye': ['Take care! 👋 Remember to take your medications on time and stay hydrated. See you next time! 🏥'],
-  'specialist': ['Choosing the right specialist: \n• Heart issues → Cardiologist\n• Brain/nerves → Neurologist\n• Skin → Dermatologist\n• Bones/joints → Orthopedic\n• Women\'s health → Gynecologist\n• Lungs → Pulmonologist\n• Hormones/diabetes → Endocrinologist\n• Stomach/liver → Gastroenterologist\n\nNot sure? Use our AI Symptom Checker!'],
-  'cost': ['Consultation fees vary by specialist and experience. Our platform shows the fee on each doctor\'s profile. Government hospital consultations are subsidized. You can filter doctors by fee range in the search. Use the AI Symptom Checker to avoid unnecessary specialist consultations.'],
-  'profile': ['To update your profile: Click your name/avatar in the navigation bar → Profile. You can update contact info, medical history, allergies, current medications, and profile photo. Keeping your medical history updated helps doctors provide better care.'],
-  'login': ['To login: Click "Login" in the top navigation. Choose "Patient" or "Doctor", enter your email and password. If you\'re new, click "Sign Up" to create a free account. Having trouble? Try resetting your password or contact support.'],
-  'register': ['To register: Click "Login" → "Sign Up" → Select "Patient" or "Doctor". Fill in your details. Doctors need to provide their specialization and qualifications. Registration is free for patients. Your account will be active immediately.'],
-  'doctor': ['Our doctors are verified medical professionals across various specializations. You can view their qualifications, experience, hospital affiliation, consultation fee, and patient reviews. Book appointments directly through the platform. Use the AI Checker to find the right specialist.']
+// ─── AI CHATBOT (Google Gemini) ───────────────────────────────────────────────
+
+const GEMINI_SYSTEM_PROMPT = `You are MedBot, a professional and friendly AI health assistant for MyDoctor's — a medical platform in India that helps patients find doctors, book appointments, track medical reports, manage medication reminders, and use an AI symptom checker.
+
+YOUR PERSONALITY:
+- Warm, empathetic, and professional
+- Use simple, clear language that non-medical users can understand
+- Add relevant emojis for friendliness (🩺💊🏥💙⚠️)
+- Keep responses concise but complete (2-5 sentences typically, use bullet points for lists)
+- Always end with a helpful follow-up offer or suggestion
+
+YOUR KNOWLEDGE AREAS:
+1. MyDoctor's Platform Features:
+   - Find Doctors: search by specialization, city, name
+   - AI Symptom Checker: interactive body diagram + symptom input → disease prediction → matched doctors
+   - Book Appointments: select doctor → choose date/time → confirm
+   - My Appointments: view/cancel appointments
+   - Dashboard: view reports, medications, prescriptions, reminders
+   - Nearby Services: hospitals, diagnostic centres, pharmacies by location
+   - Medication Reminders: auto-created when doctor prescribes, toggle on/off
+   - Medical Reports: doctors upload, patients can view & add their own
+
+2. Medical Knowledge (general guidance only, NOT diagnosis):
+   - Common symptoms and what they might indicate
+   - When to seek emergency care vs. routine consultation
+   - Which specialist treats which condition (Cardiologist, Neurologist, Dermatologist, Orthopedic, Gynecologist, Pulmonologist, Endocrinologist, Gastroenterologist, General Physician, Psychiatrist, Ophthalmologist)
+   - General health tips, medication timing, lifestyle advice
+   - Indian health context (AIIMS, common diseases in India, 102/112 emergency numbers)
+
+IMPORTANT RULES:
+- NEVER diagnose a specific medical condition — always say "this COULD indicate" or "you SHOULD consult a doctor"
+- For ANY emergency symptoms (chest pain, stroke signs, severe bleeding, difficulty breathing) → ALWAYS say call 102/112 immediately
+- Do NOT prescribe specific medications or dosages
+- Remind users to consult a real doctor for actual medical decisions
+- If asked to do something harmful, refuse politely
+- Always be encouraging about seeking professional medical care
+- Keep responses focused — don't go off-topic about non-health/non-platform topics
+
+FORMATTING:
+- Use line breaks for readability
+- Use bullet points (•) for lists
+- Bold important words with **word**
+- For emergencies use ⚠️ at the start`
+
+// Model priority list — tries each in order until one succeeds
+const GEMINI_MODELS = [
+  'gemini-3-flash-preview',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-flash-lite-latest',
+  'gemini-2.5-flash-lite'
+]
+
+async function callGeminiModel(apiKey: string, model: string, requestBody: any): Promise<string> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    }
+  )
+
+  if (!response.ok) {
+    const errText = await response.text()
+    // If 404 (deprecated) or 429 (quota) → signal caller to try next model
+    if (response.status === 404 || response.status === 429 || response.status === 503) {
+      throw new Error(`RETRY:${response.status}:${errText.substring(0, 100)}`)
+    }
+    throw new Error(`Gemini API error ${response.status}: ${errText.substring(0, 200)}`)
+  }
+
+  const data = await response.json() as any
+  const candidate = data.candidates?.[0]
+  if (!candidate) throw new Error('No response from Gemini')
+
+  if (candidate.finishReason === 'SAFETY') {
+    return "I'm unable to respond to that specific question for safety reasons. Please ask me about health topics, finding doctors, or using the MyDoctor's platform. 💙"
+  }
+
+  const text = candidate.content?.parts?.[0]?.text
+  if (!text) throw new Error('Empty response from Gemini')
+  return text.trim()
 }
 
-function generateChatResponse(message: string): string {
-  const lower = message.toLowerCase().trim()
-  
-  // Direct keyword matching
-  for (const [keyword, responses] of Object.entries(CHAT_KNOWLEDGE_BASE)) {
-    if (lower.includes(keyword)) {
-      return responses[Math.floor(Math.random() * responses.length)]
+async function callGeminiAPI(apiKey: string, messages: Array<{role: string; content: string}>, userMessage: string): Promise<string> {
+  // Build conversation history for Gemini
+  const contents: Array<{role: string; parts: Array<{text: string}>}> = []
+
+  // Add chat history (last 8 messages for context)
+  for (const msg of messages.slice(-8)) {
+    contents.push({
+      role: msg.role === 'user' ? 'user' : 'model',
+      parts: [{ text: msg.content }]
+    })
+  }
+
+  // Add current user message
+  contents.push({
+    role: 'user',
+    parts: [{ text: userMessage }]
+  })
+
+  const requestBody = {
+    system_instruction: {
+      parts: [{ text: GEMINI_SYSTEM_PROMPT }]
+    },
+    contents,
+    generationConfig: {
+      temperature: 0.75,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: 600,
+      stopSequences: []
+    },
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }
+    ]
+  }
+
+  // Try each model in order until one succeeds
+  let lastError = ''
+  for (const model of GEMINI_MODELS) {
+    try {
+      return await callGeminiModel(apiKey, model, requestBody)
+    } catch (err: any) {
+      lastError = err.message || ''
+      // Only continue to next model if RETRY signal
+      if (!lastError.startsWith('RETRY:')) throw err
+      // Otherwise try next model
+      console.log(`Model ${model} unavailable, trying next...`)
     }
   }
-  
-  // Symptom keywords  
-  const symptomWords = ['pain', 'ache', 'hurt', 'sore', 'burning', 'swelling', 'bleed', 'dizzy', 'nausea', 'vomit', 'tired', 'fatigue', 'rash', 'itch', 'fever', 'cough', 'breathe', 'palpitation', 'numbness']
-  const hasSymptom = symptomWords.some(w => lower.includes(w))
-  if (hasSymptom) {
-    return '🩺 It sounds like you might be experiencing some symptoms. I\'d recommend using our **AI Symptom Checker** for a more accurate assessment — it can analyze your symptoms and suggest the right specialist.\n\nFor immediate concerns, click "AI Checker" in the navigation menu and enter your symptoms. Would you like me to explain how to use it?'
-  }
-  
-  // Doctor-related
-  if (lower.includes('doc') || lower.includes('physician') || lower.includes('consult') || lower.includes('appoint')) {
-    return '👨‍⚕️ Looking for a doctor? You can:\n1. Go to **"Find Doctors"** and search by specialization or name\n2. Use **AI Symptom Checker** to get matched with the right specialist\n3. Browse by specialty in the navigation\n\nAll our doctors are verified professionals. Would you like help finding a specific type of specialist?'
-  }
-  
-  // Medication-related
-  if (lower.includes('medicine') || lower.includes('tablet') || lower.includes('drug') || lower.includes('medication') || lower.includes('dose') || lower.includes('pill')) {
-    return '💊 For medication information:\n• Your **prescribed medicines** are in Dashboard → Medications tab\n• **Reminders** are set automatically when doctor prescribes\n• Never self-medicate without doctor advice\n• For drug interactions, consult your doctor or pharmacist\n\nDo you need help finding your prescription or setting up reminders?'
-  }
-  
-  // Location/nearby
-  if (lower.includes('hospital') || lower.includes('clinic') || lower.includes('pharmacy') || lower.includes('lab') || lower.includes('near') || lower.includes('scan')) {
-    return '🏥 To find nearby medical services, go to the **"Nearby"** page. Allow location access and we\'ll show you:\n• Hospitals (with emergency info)\n• Diagnostic centres & labs\n• Pharmacies\n\nAll listings include distance, ratings, and contact numbers.'
-  }
-  
-  // Default intelligent fallback
-  const fallbacks = [
-    'I\'m not sure about that specific query. Could you rephrase it? I can help with:\n• 🔍 Finding doctors and booking appointments\n• 💊 Medications and reminders\n• 🩺 General health information\n• 🏥 Nearby hospitals and services',
-    'That\'s an interesting question! For accurate medical advice, I recommend consulting one of our verified doctors. I can help you book an appointment or use the AI Symptom Checker to find the right specialist.',
-    'I\'m still learning! For specific medical questions, please use the **AI Symptom Checker** or consult a doctor on our platform. I\'m best at helping you navigate MyDoctor\'s features. What else can I help with?',
-  ]
-  return fallbacks[Math.floor(Math.random() * fallbacks.length)]
+
+  throw new Error(`All Gemini models exhausted. Last error: ${lastError}`)
 }
 
 app.post('/api/chat', async (c) => {
   try {
     const body = await c.req.json()
-    const { message, session_id } = body
+    const { message, session_id, history } = body
 
     if (!message || !message.trim()) {
       return c.json({ success: false, error: 'Message required' }, 400)
@@ -1147,15 +1201,46 @@ app.post('/api/chat', async (c) => {
     const token = c.req.header('X-Session-Token')
     const authSession = token ? await getSession(c.env.DB, token) : null
     const chatSessionId = session_id || generateId('chat')
+    const apiKey = c.env.GEMINI_API_KEY
 
-    // Store user message
+    if (!apiKey) {
+      return c.json({ success: false, error: 'AI service not configured' }, 503)
+    }
+
+    // Fetch recent conversation history from DB for context
+    let dbHistory: Array<{role: string; content: string}> = []
+    try {
+      const { results } = await c.env.DB.prepare(
+        'SELECT role, content FROM chat_messages WHERE session_id = ? ORDER BY created_at ASC LIMIT 20'
+      ).bind(chatSessionId).all()
+      dbHistory = results as Array<{role: string; content: string}>
+    } catch (e) { /* non-critical */ }
+
+    // Also merge any history sent from the frontend
+    const clientHistory: Array<{role: string; content: string}> = history || []
+    const combinedHistory = dbHistory.length > 0 ? dbHistory : clientHistory
+
+    // Store user message first
     try {
       await c.env.DB.prepare(
         'INSERT INTO chat_messages (session_id, user_id, role, content) VALUES (?, ?, ?, ?)'
-      ).bind(chatSessionId, authSession ? String(authSession.user_id) : 'anonymous', 'user', message).run()
+      ).bind(
+        chatSessionId,
+        authSession ? String(authSession.user_id) : 'anonymous',
+        'user',
+        message
+      ).run()
     } catch (e) { /* non-critical */ }
 
-    const reply = generateChatResponse(message)
+    // Call Gemini API
+    let reply: string
+    try {
+      reply = await callGeminiAPI(apiKey, combinedHistory, message)
+    } catch (geminiErr: any) {
+      console.error('Gemini error:', geminiErr.message)
+      // Fallback response if Gemini fails
+      reply = "I'm having trouble connecting to the AI service right now. Please try again in a moment. For urgent medical concerns, please call 102 (emergency) or visit your nearest hospital. 🏥"
+    }
 
     // Store bot reply
     try {
@@ -1959,7 +2044,7 @@ app.get('*', (c) => {
 <!-- ═══════════════ AI CHATBOT WIDGET ═══════════════ -->
 <div id="chatbotWidget" class="chatbot-widget">
   <!-- Floating Button -->
-  <button class="chatbot-toggle" id="chatbotToggle" onclick="toggleChatbot()" title="Ask MedBot">
+  <button class="chatbot-toggle" id="chatbotToggle" onclick="toggleChatbot()" title="Ask MedBot — Powered by Gemini AI">
     <i class="fas fa-robot chatbot-open-icon"></i>
     <i class="fas fa-times chatbot-close-icon" style="display:none"></i>
     <span class="chatbot-badge" id="chatBadge" style="display:none">1</span>
@@ -1973,7 +2058,7 @@ app.get('*', (c) => {
         <span class="chatbot-status-dot"></span>
       </div>
       <div class="chatbot-info">
-        <h4>MedBot</h4>
+        <h4>MedBot <span class="gemini-badge">✨ Gemini AI</span></h4>
         <span>AI Health Assistant • Always Online</span>
       </div>
       <button class="chatbot-minimize" onclick="toggleChatbot()"><i class="fas fa-chevron-down"></i></button>
@@ -1983,32 +2068,34 @@ app.get('*', (c) => {
       <div class="chat-msg bot">
         <div class="chat-avatar"><i class="fas fa-robot"></i></div>
         <div class="chat-bubble">
-          👋 Hi! I'm <strong>MedBot</strong>, your AI health assistant.<br><br>
+          👋 Hi! I'm <strong>MedBot</strong>, your AI health assistant powered by <strong>Google Gemini</strong>.<br><br>
           I can help you with:<br>
-          • 🩺 Health questions &amp; symptoms<br>
-          • 📅 Booking appointments<br>
+          • 🩺 Health questions &amp; symptom guidance<br>
+          • 📅 Booking &amp; managing appointments<br>
           • 💊 Medications &amp; reminders<br>
-          • 🏥 Finding nearby services<br><br>
-          How can I help you today?
+          • 🏥 Finding nearby hospitals<br>
+          • 📋 Understanding your reports<br><br>
+          Ask me anything — I understand natural language! 💬
         </div>
       </div>
       <div class="chat-quick-replies" id="quickReplies">
-        <button onclick="sendQuickReply('How do I book an appointment?')">📅 Book appointment</button>
-        <button onclick="sendQuickReply('How does AI Checker work?')">🤖 AI Symptom Checker</button>
-        <button onclick="sendQuickReply('Show me emergency contacts')">🚨 Emergency</button>
-        <button onclick="sendQuickReply('How do I view my reports?')">📋 My Reports</button>
+        <button onclick="sendQuickReply('How do I book an appointment with a doctor?')">📅 Book appointment</button>
+        <button onclick="sendQuickReply('How does the AI Symptom Checker work?')">🤖 AI Symptom Checker</button>
+        <button onclick="sendQuickReply('I have chest pain and shortness of breath')">🚨 Emergency guidance</button>
+        <button onclick="sendQuickReply('How do I view my medical reports and prescriptions?')">📋 My Reports</button>
+        <button onclick="sendQuickReply('Which specialist should I see for back pain?')">👨‍⚕️ Find specialist</button>
       </div>
     </div>
 
     <div class="chatbot-input-area">
       <div class="chatbot-input-wrap">
-        <input type="text" id="chatInput" placeholder="Type your health question..." 
-               onkeydown="if(event.key==='Enter') sendChatMessage()">
+        <input type="text" id="chatInput" placeholder="Ask anything about health or this platform..." 
+               onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendChatMessage(); }">
         <button onclick="sendChatMessage()" class="chat-send-btn" id="chatSendBtn">
           <i class="fas fa-paper-plane"></i>
         </button>
       </div>
-      <p class="chat-disclaimer">For emergencies, call 102 | Not a substitute for medical advice</p>
+      <p class="chat-disclaimer">⚡ Powered by Google Gemini AI &nbsp;|&nbsp; 🚨 Emergencies: Call 102</p>
     </div>
   </div>
 </div>

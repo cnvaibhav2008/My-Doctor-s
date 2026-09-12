@@ -764,7 +764,16 @@ ul { list-style: none; }
 }
 @keyframes pulse-dot { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
 
-.chatbot-info h4 { font-size: 0.95rem; font-weight: 700; margin: 0 0 2px; }
+.chatbot-info h4 { font-size: 0.95rem; font-weight: 700; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+.gemini-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(255,255,255,0.25);
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
 .chatbot-info span { font-size: 0.72rem; opacity: 0.85; }
 
 .chatbot-minimize {
@@ -828,6 +837,12 @@ ul { list-style: none; }
   border-bottom-left-radius: 4px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
+.chat-msg.bot .chat-bubble ul {
+  margin: 6px 0 4px 16px;
+  padding: 0;
+  list-style: disc;
+}
+.chat-msg.bot .chat-bubble li { margin-bottom: 3px; }
 .chat-msg.user .chat-bubble {
   background: linear-gradient(135deg, var(--primary), var(--purple));
   color: white;
