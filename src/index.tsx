@@ -1268,6 +1268,16 @@ app.get('*', (c) => {
 <title>MyDoctor's - Find the Right Doctor Near You</title>
 <meta name="description" content="Find and book the best doctors near you. AI-powered disease prediction, symptom checker, nearby hospitals and medical services.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>">
+<!-- Anti-FOUC: apply saved theme BEFORE any CSS loads to prevent white flash -->
+<script>
+(function(){
+  try {
+    var saved = localStorage.getItem('md-theme');
+    var preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', saved || preferred);
+  } catch(e) {}
+})();
+</script>
 <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <link href="/static/styles.css" rel="stylesheet">
@@ -1318,6 +1328,9 @@ app.get('*', (c) => {
           <a onclick="logout()" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
         </div>
       </div>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Switch Dark/Light Mode" aria-label="Toggle dark mode">
+        <i class="fas fa-moon" id="themeIcon"></i>
+      </button>
       <button class="hamburger" id="hamburger" onclick="toggleMenu()">
         <span></span><span></span><span></span>
       </button>
@@ -2044,7 +2057,7 @@ app.get('*', (c) => {
 <!-- ═══════════════ AI CHATBOT WIDGET ═══════════════ -->
 <div id="chatbotWidget" class="chatbot-widget">
   <!-- Floating Button -->
-  <button class="chatbot-toggle" id="chatbotToggle" onclick="toggleChatbot()" title="Ask MedBot — Powered by Gemini AI">
+  <button class="chatbot-toggle" id="chatbotToggle" onclick="toggleChatbot()" title="Chat with MedBot — AI Health Assistant">
     <i class="fas fa-robot chatbot-open-icon"></i>
     <i class="fas fa-times chatbot-close-icon" style="display:none"></i>
     <span class="chatbot-badge" id="chatBadge" style="display:none">1</span>
@@ -2058,7 +2071,7 @@ app.get('*', (c) => {
         <span class="chatbot-status-dot"></span>
       </div>
       <div class="chatbot-info">
-        <h4>MedBot <span class="gemini-badge">✨ Gemini AI</span></h4>
+        <h4>MedBot</h4>
         <span>AI Health Assistant • Always Online</span>
       </div>
       <button class="chatbot-minimize" onclick="toggleChatbot()"><i class="fas fa-chevron-down"></i></button>
@@ -2068,7 +2081,7 @@ app.get('*', (c) => {
       <div class="chat-msg bot">
         <div class="chat-avatar"><i class="fas fa-robot"></i></div>
         <div class="chat-bubble">
-          👋 Hi! I'm <strong>MedBot</strong>, your AI health assistant powered by <strong>Google Gemini</strong>.<br><br>
+          👋 Hi! I'm <strong>MedBot</strong>, your personal AI health assistant.<br><br>
           I can help you with:<br>
           • 🩺 Health questions &amp; symptom guidance<br>
           • 📅 Booking &amp; managing appointments<br>
@@ -2095,7 +2108,7 @@ app.get('*', (c) => {
           <i class="fas fa-paper-plane"></i>
         </button>
       </div>
-      <p class="chat-disclaimer">⚡ Powered by Google Gemini AI &nbsp;|&nbsp; 🚨 Emergencies: Call 102</p>
+      <p class="chat-disclaimer">🤖 AI Health Assistant &nbsp;|&nbsp; 🚨 Emergencies: Call 102</p>
     </div>
   </div>
 </div>

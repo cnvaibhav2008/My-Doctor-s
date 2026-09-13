@@ -1816,8 +1816,44 @@ async function sendChatMessage() {
   $('chatInput').focus();
 }
 
+// ─── DARK / LIGHT MODE ────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('md-theme');
+  const preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const theme = saved || preferred;
+  document.documentElement.setAttribute('data-theme', theme);
+  updateThemeIcon(theme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('md-theme', next);
+  updateThemeIcon(next);
+  showToast(next === 'dark' ? '🌙 Dark mode on' : '☀️ Light mode on', 'info', 1800);
+}
+
+function updateThemeIcon(theme) {
+  const icon = $('themeIcon');
+  if (!icon) return;
+  icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+}
+
+// Listen for OS-level dark/light changes (when no manual override saved)
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+  if (!localStorage.getItem('md-theme')) {
+    const theme = e.matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+    updateThemeIcon(theme);
+  }
+});
+
 // ─── INIT ─────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
+  // ── THEME: apply saved preference immediately ──
+  initTheme();
+
   // Hide loading screen
   setTimeout(() => {
     $('loadingScreen')?.classList.add('fade-out');
@@ -1841,20 +1877,28 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.symptom-tags-input')) hideSuggestions();
     if (!e.target.closest('.disease-search-input')) { if ($('diseaseSuggestions')) $('diseaseSuggestions').innerHTML = ''; }
+    // Close user dropdown when clicking outside
+    if (!e.target.closest('.user-menu')) {
+      $('userDropdown')?.classList.remove('open');
+    }
   });
 
-  // Scroll to top button
+  // Scroll-to-top + navbar scroll effect
   document.addEventListener('scroll', () => {
-    const scrolled = window.scrollY > 500;
+    const scrolled = window.scrollY > 60;
+    $('navbar')?.classList.toggle('scrolled', scrolled);
+
+    const scrolledFar = window.scrollY > 500;
     let btn = $('scrollTopBtn');
-    if (!btn && scrolled) {
+    if (!btn && scrolledFar) {
       btn = document.createElement('button');
       btn.id = 'scrollTopBtn';
       btn.innerHTML = '<i class="fas fa-arrow-up"></i>';
-      btn.style.cssText = 'position:fixed;bottom:90px;right:24px;width:44px;height:44px;border-radius:50%;background:var(--primary);color:white;font-size:1rem;box-shadow:var(--shadow-lg);z-index:999;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;transition:all 0.3s';
+      btn.style.cssText = 'position:fixed;bottom:90px;right:22px;width:42px;height:42px;border-radius:50%;background:var(--primary);color:white;font-size:0.95rem;box-shadow:var(--shadow-lg);z-index:999;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;transition:all 0.3s;opacity:0.9';
       btn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
       document.body.appendChild(btn);
     }
+    if (btn) btn.style.display = scrolledFar ? 'flex' : 'none';
   });
 
   // Request notification permission for reminders
