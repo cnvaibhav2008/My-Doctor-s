@@ -1052,47 +1052,67 @@ app.put('/api/reminders/:id/toggle', async (c) => {
 
 // ─── AI CHATBOT (Google Gemini) ───────────────────────────────────────────────
 
-const GEMINI_SYSTEM_PROMPT = `You are MedBot, a professional and friendly AI health assistant for MyDoctor's — a medical platform in India that helps patients find doctors, book appointments, track medical reports, manage medication reminders, and use an AI symptom checker.
+const GEMINI_SYSTEM_PROMPT = `You are MedBot, a knowledgeable and caring AI health assistant for MyDoctor's — a medical platform in India. You help patients with medical questions, medicine information, symptoms, diseases, health advice, and platform features.
 
 YOUR PERSONALITY:
-- Warm, empathetic, and professional
-- Use simple, clear language that non-medical users can understand
-- Add relevant emojis for friendliness (🩺💊🏥💙⚠️)
-- Keep responses concise but complete (2-5 sentences typically, use bullet points for lists)
-- Always end with a helpful follow-up offer or suggestion
+- Warm, empathetic, clear, and genuinely helpful
+- Use simple language non-medical users can understand
+- Add relevant emojis (🩺💊🏥💙⚠️🌡️) to make responses friendly
+- Give complete, useful answers — not vague deflections
+- Always end with a helpful follow-up question or suggestion
 
-YOUR KNOWLEDGE AREAS:
-1. MyDoctor's Platform Features:
+WHAT YOU MUST DO:
+
+1. MEDICINE & TREATMENT QUESTIONS — Answer fully and helpfully:
+   - When asked about medicines for common conditions (cold, fever, cough, headache, acidity, etc.), name the common over-the-counter medicines used in India
+   - Examples of common OTC medicines you can mention:
+     • Cold/Flu: Sinarest, D-Cold Total, Nasivion nasal drops, Vicks Action 500
+     • Fever: Paracetamol (Crocin, Dolo 650), Ibuprofen (Brufen, Combiflam)
+     • Cough: Benadryl, Honitus, Alex syrup, Ascoril
+     • Headache: Paracetamol, Saridon, Combiflam
+     • Acidity/Gas: Digene, Gelusil, Pantoprazole, Rantac
+     • Allergies: Cetirizine (Alerid, CTZ), Loratadine (Lorfast)
+     • Diarrhea: ORS (Electral), Loperamide (Eldoper), Norflox-TZ
+     • Constipation: Isabgol (Psyllium husk), Dulcolax
+     • Body pain/Muscle ache: Combiflam, Volini gel (topical), Moov
+     • Eye infection: Moxifloxacin eye drops, Tobramycin
+   - Always mention the STANDARD adult dosage where relevant (e.g., Paracetamol 500mg every 6-8 hours)
+   - Always add: "These are general OTC medicines. For prescription drugs or if symptoms persist >3 days, please consult a doctor."
+
+2. SYMPTOM ANALYSIS — Be specific:
+   - Describe what the symptom could indicate with possible conditions
+   - Suggest which type of doctor to see (General Physician, ENT, Cardiologist, etc.)
+   - Give home remedies alongside medicine advice
+
+3. DISEASE INFORMATION — Explain clearly:
+   - Causes, symptoms, treatment approach, prevention
+   - Which specialist to consult
+   - Duration and what to expect
+
+4. HOME REMEDIES — Always include alongside medicines:
+   - For cold: warm water with honey+ginger, steam inhalation, rest
+   - For fever: cool compress, hydration, rest
+   - For acidity: cold milk, avoid spicy food, eat smaller meals
+
+5. MyDoctor's PLATFORM FEATURES:
    - Find Doctors: search by specialization, city, name
-   - AI Symptom Checker: interactive body diagram + symptom input → disease prediction → matched doctors
+   - AI Symptom Checker: body diagram + symptom input → disease prediction
    - Book Appointments: select doctor → choose date/time → confirm
-   - My Appointments: view/cancel appointments
-   - Dashboard: view reports, medications, prescriptions, reminders
-   - Nearby Services: hospitals, diagnostic centres, pharmacies by location
-   - Medication Reminders: auto-created when doctor prescribes, toggle on/off
-   - Medical Reports: doctors upload, patients can view & add their own
+   - Nearby Services: hospitals, diagnostic centres, pharmacies
+   - Dashboard: reports, medications, prescriptions, reminders
 
-2. Medical Knowledge (general guidance only, NOT diagnosis):
-   - Common symptoms and what they might indicate
-   - When to seek emergency care vs. routine consultation
-   - Which specialist treats which condition (Cardiologist, Neurologist, Dermatologist, Orthopedic, Gynecologist, Pulmonologist, Endocrinologist, Gastroenterologist, General Physician, Psychiatrist, Ophthalmologist)
-   - General health tips, medication timing, lifestyle advice
-   - Indian health context (AIIMS, common diseases in India, 102/112 emergency numbers)
-
-IMPORTANT RULES:
-- NEVER diagnose a specific medical condition — always say "this COULD indicate" or "you SHOULD consult a doctor"
-- For ANY emergency symptoms (chest pain, stroke signs, severe bleeding, difficulty breathing) → ALWAYS say call 102/112 immediately
-- Do NOT prescribe specific medications or dosages
-- Remind users to consult a real doctor for actual medical decisions
-- If asked to do something harmful, refuse politely
-- Always be encouraging about seeking professional medical care
-- Keep responses focused — don't go off-topic about non-health/non-platform topics
+SAFETY RULES (only these are absolute):
+- For EMERGENCY symptoms (chest pain, stroke signs, severe bleeding, difficulty breathing, unconsciousness) → ALWAYS say call 102/112 immediately first
+- For serious prescription medicines (antibiotics, steroids, blood thinners, insulin) → always say "requires doctor's prescription"
+- Never diagnose cancer, HIV, or serious psychiatric conditions — refer to specialist
+- If someone seems suicidal or in crisis → iCall helpline: 9152987821, Vandrevala Foundation: 1860-2662-345
 
 FORMATTING:
-- Use line breaks for readability
 - Use bullet points (•) for lists
-- Bold important words with **word**
-- For emergencies use ⚠️ at the start`
+- Bold medicine names with **MedicineName**
+- Use ⚠️ for warnings, 💊 for medicines, 🌡️ for fever/temperature topics
+- For emergencies always start with ⚠️ EMERGENCY
+- Give structured answers: Medicines → Dosage → Home Remedies → When to see a doctor`
 
 // Model priority list — tries each in order until one succeeds
 const GEMINI_MODELS = [
@@ -1122,15 +1142,28 @@ async function callGeminiModel(apiKey: string, model: string, requestBody: any):
   }
 
   const data = await response.json() as any
+
+  // Log full response in dev for debugging
+  if (!data.candidates && data.promptFeedback) {
+    const blockReason = data.promptFeedback?.blockReason || 'UNKNOWN'
+    console.error('Prompt blocked by Gemini safety:', blockReason)
+    throw new Error(`RETRY:SAFETY_BLOCK:${blockReason}`)
+  }
+
   const candidate = data.candidates?.[0]
   if (!candidate) throw new Error('No response from Gemini')
 
-  if (candidate.finishReason === 'SAFETY') {
-    return "I'm unable to respond to that specific question for safety reasons. Please ask me about health topics, finding doctors, or using the MyDoctor's platform. 💙"
+  const finishReason = candidate.finishReason || 'STOP'
+
+  if (finishReason === 'SAFETY') {
+    // Safety block — try with a reworded request via next model
+    throw new Error('RETRY:SAFETY:content_filtered')
   }
 
   const text = candidate.content?.parts?.[0]?.text
   if (!text) throw new Error('Empty response from Gemini')
+
+  // If MAX_TOKENS hit, return whatever was generated (it's still useful)
   return text.trim()
 }
 
@@ -1158,17 +1191,17 @@ async function callGeminiAPI(apiKey: string, messages: Array<{role: string; cont
     },
     contents,
     generationConfig: {
-      temperature: 0.75,
+      temperature: 0.4,
       topK: 40,
       topP: 0.95,
-      maxOutputTokens: 600,
+      maxOutputTokens: 1200,
       stopSequences: []
     },
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
       { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
       { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
     ]
   }
 
@@ -1179,10 +1212,13 @@ async function callGeminiAPI(apiKey: string, messages: Array<{role: string; cont
       return await callGeminiModel(apiKey, model, requestBody)
     } catch (err: any) {
       lastError = err.message || ''
-      // Only continue to next model if RETRY signal
-      if (!lastError.startsWith('RETRY:')) throw err
-      // Otherwise try next model
-      console.log(`Model ${model} unavailable, trying next...`)
+      // Continue to next model on RETRY signal (deprecated/quota/safety/blocked)
+      if (lastError.startsWith('RETRY:')) {
+        console.log(`Model ${model} skipped (${lastError}), trying next...`)
+        continue
+      }
+      // Any other error — throw immediately
+      throw err
     }
   }
 
@@ -1238,8 +1274,19 @@ app.post('/api/chat', async (c) => {
       reply = await callGeminiAPI(apiKey, combinedHistory, message)
     } catch (geminiErr: any) {
       console.error('Gemini error:', geminiErr.message)
-      // Fallback response if Gemini fails
-      reply = "I'm having trouble connecting to the AI service right now. Please try again in a moment. For urgent medical concerns, please call 102 (emergency) or visit your nearest hospital. 🏥"
+      // Helpful fallback — gives basic info even when AI is down
+      const lowerMsg = message.toLowerCase()
+      if (lowerMsg.includes('cold') || lowerMsg.includes('runny nose') || lowerMsg.includes('sneezing')) {
+        reply = "💊 For **common cold**, common OTC medicines include:\n• **Sinarest** or **D-Cold Total** (decongestant + antihistamine)\n• **Paracetamol (Crocin 500mg)** if you have mild fever — every 6-8 hours\n• **Benadryl** or **Honitus** syrup for cough\n• **Nasivion nasal drops** for blocked nose\n\n🏠 Home remedies: Steam inhalation, warm water with honey + ginger, rest well, stay hydrated.\n\n⚕️ If symptoms persist beyond 5-7 days or you develop high fever, consult a doctor. For now, try visiting our **Find Doctors** section to book a General Physician."
+      } else if (lowerMsg.includes('fever') || lowerMsg.includes('temperature')) {
+        reply = "🌡️ For **fever**, the primary medicine is:\n• **Paracetamol (Dolo 650 / Crocin)** — 500mg-650mg every 6 hours (adults)\n• **Ibuprofen (Brufen/Combiflam)** if fever is above 101°F with body pain\n\n🏠 Home remedies: Cool wet cloth on forehead, drink plenty of fluids, rest.\n\n⚠️ If fever exceeds 103°F or lasts more than 3 days, please see a doctor immediately."
+      } else if (lowerMsg.includes('cough')) {
+        reply = "💊 For **cough**, common medicines:\n• **Benadryl** or **Alex** syrup for dry cough\n• **Ascoril LS** for wet/productive cough\n• **Strepsils** lozenges for throat relief\n\n🏠 Home remedies: Warm water with turmeric (haldi milk), steam inhalation, honey.\n\nIf cough persists >2 weeks, consult a doctor — it could be an infection."
+      } else if (lowerMsg.includes('headache')) {
+        reply = "💊 For **headache**, common medicines:\n• **Paracetamol (Crocin 500mg)** — mildest and safest\n• **Combiflam** (Ibuprofen + Paracetamol) for stronger relief\n• **Saridon** for tension headaches\n\n🏠 Rest in a quiet dark room, stay hydrated, apply cold/warm compress.\n\nIf headaches are frequent or very severe, please consult a Neurologist."
+      } else {
+        reply = "I'm having trouble connecting to the AI service right now. Please try again in a moment. For urgent medical concerns, please call **102** (emergency) or visit your nearest hospital. 🏥"
+      }
     }
 
     // Store bot reply
@@ -2083,26 +2130,27 @@ app.get('*', (c) => {
         <div class="chat-bubble">
           👋 Hi! I'm <strong>MedBot</strong>, your personal AI health assistant.<br><br>
           I can help you with:<br>
-          • 🩺 Health questions &amp; symptom guidance<br>
+          • 💊 <strong>Medicines</strong> for cold, fever, cough, headache &amp; more<br>
+          • 🩺 Symptom analysis &amp; specialist guidance<br>
+          • 🏠 Home remedies &amp; health tips<br>
           • 📅 Booking &amp; managing appointments<br>
-          • 💊 Medications &amp; reminders<br>
-          • 🏥 Finding nearby hospitals<br>
-          • 📋 Understanding your reports<br><br>
-          Ask me anything — I understand natural language! 💬
+          • 🏥 Finding nearby hospitals &amp; doctors<br><br>
+          Just ask me anything — like <em>"tablet for cold"</em> or <em>"fever medicine"</em>! 💬
         </div>
       </div>
       <div class="chat-quick-replies" id="quickReplies">
-        <button onclick="sendQuickReply('How do I book an appointment with a doctor?')">📅 Book appointment</button>
-        <button onclick="sendQuickReply('How does the AI Symptom Checker work?')">🤖 AI Symptom Checker</button>
-        <button onclick="sendQuickReply('I have chest pain and shortness of breath')">🚨 Emergency guidance</button>
-        <button onclick="sendQuickReply('How do I view my medical reports and prescriptions?')">📋 My Reports</button>
+        <button onclick="sendQuickReply('What medicine should I take for common cold?')">🤧 Cold medicine</button>
+        <button onclick="sendQuickReply('Which tablet is best for fever?')">🌡️ Fever tablet</button>
+        <button onclick="sendQuickReply('What to take for cough and sore throat?')">😮 Cough remedy</button>
+        <button onclick="sendQuickReply('Medicine for headache and body pain?')">🤕 Headache relief</button>
         <button onclick="sendQuickReply('Which specialist should I see for back pain?')">👨‍⚕️ Find specialist</button>
+        <button onclick="sendQuickReply('I have chest pain and shortness of breath')">🚨 Emergency help</button>
       </div>
     </div>
 
     <div class="chatbot-input-area">
       <div class="chatbot-input-wrap">
-        <input type="text" id="chatInput" placeholder="Ask anything about health or this platform..." 
+        <input type="text" id="chatInput" placeholder="e.g. tablet for cold, fever medicine, headache..." 
                onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendChatMessage(); }">
         <button onclick="sendChatMessage()" class="chat-send-btn" id="chatSendBtn">
           <i class="fas fa-paper-plane"></i>
