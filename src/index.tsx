@@ -1303,6 +1303,10 @@ app.post('/api/chat', async (c) => {
 })
 
 // ─── STATIC FILES ─────────────────────────────────────────────────────────────
+// All static assets (/static/*, /icons/*, /manifest.json, /sw.js, /favicon.ico)
+// are served directly by Cloudflare Pages CDN as static files.
+// They are excluded from the Worker via _routes.json (in public/).
+// serveStatic for /static/* handles the local wrangler pages dev fallback.
 app.use('/static/*', serveStatic({ root: './public' }))
 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
@@ -1311,22 +1315,59 @@ app.get('*', (c) => {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
 <title>MyDoctor's - Find the Right Doctor Near You</title>
 <meta name="description" content="Find and book the best doctors near you. AI-powered disease prediction, symptom checker, nearby hospitals and medical services.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>">
-<!-- Anti-FOUC: apply saved theme BEFORE any CSS loads to prevent white flash -->
+
+<!-- PWA Meta Tags -->
+<meta name="application-name" content="MyDoctor's">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MyDoctor's">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="msapplication-TileColor" content="#0052CC">
+<meta name="msapplication-TileImage" content="/icons/icon-144x144.png">
+<meta name="theme-color" content="#0052CC" id="themeColorMeta">
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="/manifest.json">
+
+<!-- App Icons -->
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png">
+<link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144x144.png">
+<link rel="apple-touch-icon" sizes="120x120" href="/icons/icon-128x128.png">
+
+<!-- Apple Splash Screens -->
+<link rel="apple-touch-startup-image" href="/icons/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="/icons/splash-1242x2208.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="/icons/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">
+<link rel="apple-touch-startup-image" href="/icons/splash-640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)">
+<link rel="apple-touch-startup-image" href="/icons/splash-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)">
+
+<!-- Open Graph for sharing -->
+<meta property="og:title" content="MyDoctor's - Find the Right Doctor">
+<meta property="og:description" content="AI-powered medical platform. Find doctors, book appointments, AI symptom checker.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="/icons/icon-512x512.png">
+
+<!-- Anti-FOUC: apply saved theme BEFORE any CSS loads -->
 <script>
 (function(){
   try {
     var saved = localStorage.getItem('md-theme');
     var preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', saved || preferred);
+    var theme = saved || preferred;
+    document.documentElement.setAttribute('data-theme', theme);
+    // Update theme-color meta
+    var meta = document.getElementById('themeColorMeta');
+    if (meta) meta.content = theme === 'dark' ? '#0D1B2E' : '#0052CC';
   } catch(e) {}
 })();
 </script>
 <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link href="/static/styles.css" rel="stylesheet">
 </head>
 <body>
@@ -2053,9 +2094,6 @@ app.get('*', (c) => {
   </div>
 </div>
 
-<!-- Toast Notification -->
-<div id="toast" class="toast"></div>
-
 <!-- Footer -->
 <footer class="footer">
   <div class="footer-container">
@@ -2098,8 +2136,6 @@ app.get('*', (c) => {
     </div>
   </div>
 </footer>
-
-<script src="/static/app.js"></script>
 
 <!-- ═══════════════ AI CHATBOT WIDGET ═══════════════ -->
 <div id="chatbotWidget" class="chatbot-widget">
@@ -2160,6 +2196,53 @@ app.get('*', (c) => {
     </div>
   </div>
 </div>
+
+<!-- ═══════════════ PWA INSTALL BANNER ═══════════════ -->
+<div id="pwaInstallBanner" class="pwa-install-banner" style="display:none">
+  <div class="pwa-banner-icon">
+    <img src="/icons/icon-72x72.png" alt="MyDoctor's">
+  </div>
+  <div class="pwa-banner-text">
+    <strong>Install MyDoctor's</strong>
+    <span>Add to home screen for quick access</span>
+  </div>
+  <div class="pwa-banner-actions">
+    <button class="pwa-install-btn" id="pwaInstallBtn" onclick="triggerPWAInstall()">Install</button>
+    <button class="pwa-dismiss-btn" onclick="dismissInstallBanner()"><i class="fas fa-times"></i></button>
+  </div>
+</div>
+
+<!-- ═══════════════ BOTTOM NAVIGATION (Mobile App) ═══════════════ -->
+<nav class="bottom-nav" id="bottomNav">
+  <button class="bottom-nav-item active" id="bnHome" onclick="showPage('home'); setBottomNav('bnHome')" aria-label="Home">
+    <i class="fas fa-home"></i>
+    <span>Home</span>
+  </button>
+  <button class="bottom-nav-item" id="bnDoctors" onclick="showPage('findDoctors'); setBottomNav('bnDoctors')" aria-label="Doctors">
+    <i class="fas fa-stethoscope"></i>
+    <span>Doctors</span>
+  </button>
+  <button class="bottom-nav-item bottom-nav-center" id="bnAI" onclick="showPage('aiChecker'); setBottomNav('bnAI')" aria-label="AI Checker">
+    <div class="bottom-nav-fab">
+      <i class="fas fa-robot"></i>
+    </div>
+    <span>AI Check</span>
+  </button>
+  <button class="bottom-nav-item" id="bnAppts" onclick="showPage('appointments'); setBottomNav('bnAppts')" aria-label="Appointments">
+    <i class="fas fa-calendar-check"></i>
+    <span>Appts</span>
+    <span class="bottom-nav-badge" id="apptBadge" style="display:none">0</span>
+  </button>
+  <button class="bottom-nav-item" id="bnChat" onclick="showPage('chat'); setBottomNav('bnChat')" aria-label="MedBot">
+    <i class="fas fa-comment-medical"></i>
+    <span>MedBot</span>
+  </button>
+</nav>
+
+<!-- TOAST NOTIFICATION -->
+<div id="toast" class="toast"></div>
+
+<script src="/static/app.js"></script>
 </body>
 </html>`)
 })

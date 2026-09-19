@@ -1511,3 +1511,359 @@ button:focus-visible, a:focus-visible {
   outline-offset: 3px;
 }
 
+
+/* ═══════════════════════════════════════════════════════
+   PWA MOBILE APP STYLES — Bottom Nav, Install Banner,
+   Safe Area Insets, App-mode Adjustments
+═══════════════════════════════════════════════════════ */
+
+/* ─── SAFE AREA INSETS (iPhone notch / home indicator) ─ */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --bottom-nav-height: 72px;
+}
+
+/* ─── BOTTOM NAVIGATION BAR ───────────────────────────── */
+.bottom-nav {
+  display: none; /* hidden on desktop */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--bottom-nav-height) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.10);
+  z-index: 1100;
+  display: none;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: space-around;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+[data-theme="dark"] .bottom-nav {
+  background: rgba(13,27,46,0.97);
+  border-top-color: #1a2d44;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.40);
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 500;
+  font-family: inherit;
+  padding: 8px 4px;
+  min-height: 56px;
+  transition: color 0.2s, transform 0.15s;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+  letter-spacing: 0.01em;
+}
+
+.bottom-nav-item i {
+  font-size: 1.25rem;
+  transition: transform 0.2s;
+}
+
+.bottom-nav-item.active {
+  color: var(--primary);
+}
+
+.bottom-nav-item.active i {
+  transform: translateY(-2px);
+}
+
+.bottom-nav-item:active {
+  transform: scale(0.92);
+}
+
+/* Center FAB button (AI Checker) */
+.bottom-nav-center {
+  margin-top: -18px;
+  color: var(--primary) !important;
+}
+
+.bottom-nav-fab {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #4D8FFF);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.35rem;
+  box-shadow: 0 4px 18px rgba(0,82,204,0.45);
+  transition: transform 0.2s, box-shadow 0.2s;
+  margin-bottom: 2px;
+}
+
+.bottom-nav-center.active .bottom-nav-fab,
+.bottom-nav-center:active .bottom-nav-fab {
+  transform: scale(0.93);
+  box-shadow: 0 2px 10px rgba(0,82,204,0.35);
+}
+
+[data-theme="dark"] .bottom-nav-fab {
+  box-shadow: 0 4px 18px rgba(77,143,255,0.4);
+}
+
+/* Badge (appointment count etc.) */
+.bottom-nav-badge {
+  position: absolute;
+  top: 6px;
+  right: calc(50% - 20px);
+  background: #EF4444;
+  color: white;
+  font-size: 0.55rem;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 2px solid var(--surface);
+}
+
+/* ─── PAGE PADDING FOR BOTTOM NAV ─────────────────────── */
+/* On mobile (≤768px) push content up so bottom nav doesn't cover it */
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: flex !important;
+  }
+
+  /* Add bottom padding to all pages so content isn't under the nav */
+  .page {
+    padding-bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 12px);
+  }
+
+  /* Footer also needs padding */
+  .footer {
+    padding-bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 16px);
+  }
+
+  /* Chatbot widget sits above bottom nav */
+  .chatbot-widget {
+    bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 12px);
+  }
+
+  /* Scroll-to-top button sits above bottom nav */
+  #scrollTopBtn {
+    bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 16px) !important;
+  }
+
+  /* Hide desktop hamburger nav menu links on mobile (bottom nav replaces it) */
+  .nav-menu {
+    display: none !important;
+  }
+
+  /* Navbar gets safe-area top padding when installed as PWA */
+  .navbar {
+    padding-top: max(env(safe-area-inset-top, 0px), 0px);
+  }
+
+  /* Top navbar slightly more compact on mobile */
+  .nav-container {
+    padding: 0 12px;
+    min-height: 56px;
+  }
+}
+
+/* Show bottom nav only on mobile — NOT on standalone PWA desktop */
+@media (display-mode: standalone) and (max-width: 768px) {
+  .bottom-nav {
+    display: flex !important;
+  }
+}
+
+/* When running as installed PWA on iOS (standalone) */
+@media (display-mode: standalone) {
+  .navbar {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* ─── PWA INSTALL BANNER ──────────────────────────────── */
+.pwa-install-banner {
+  position: fixed;
+  bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 10px);
+  left: 12px;
+  right: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  z-index: 1200;
+  animation: slideUpBanner 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+[data-theme="dark"] .pwa-install-banner {
+  background: #0D1B2E;
+  border-color: #1a2d44;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+}
+
+@keyframes slideUpBanner {
+  from { transform: translateY(100px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+.pwa-banner-icon img {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,82,204,0.25);
+  flex-shrink: 0;
+}
+
+.pwa-banner-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pwa-banner-text strong {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.pwa-banner-text span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.pwa-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.pwa-install-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s, transform 0.15s;
+  white-space: nowrap;
+}
+
+.pwa-install-btn:active {
+  transform: scale(0.96);
+  background: var(--primary-dark, #003d99);
+}
+
+.pwa-dismiss-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pwa-dismiss-btn:hover {
+  background: var(--bg-secondary);
+}
+
+/* On desktop, install banner is shown differently */
+@media (min-width: 769px) {
+  .pwa-install-banner {
+    bottom: 20px;
+    left: auto;
+    right: 24px;
+    width: 340px;
+  }
+}
+
+/* ─── ACTIVE INDICATOR DOT for bottom nav ─────────────── */
+.bottom-nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  width: 4px;
+  height: 4px;
+  background: var(--primary);
+  border-radius: 50%;
+}
+
+/* ─── PWA OFFLINE TOAST ───────────────────────────────── */
+.offline-toast {
+  position: fixed;
+  top: calc(64px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  background: #FF6B35;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 24px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  z-index: 9999;
+  box-shadow: 0 4px 16px rgba(255,107,53,0.4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0);     opacity: 1; }
+}
+
+/* ─── LOADING SCREEN SAFE AREA ────────────────────────── */
+.loading-screen {
+  padding-top: var(--safe-top);
+}
+
+/* ─── SPLASH SCREEN LOOK (when installed, brief flash) ── */
+@media (display-mode: standalone) {
+  .loading-screen {
+    background: linear-gradient(135deg, #0052CC 0%, #0066FF 50%, #4D8FFF 100%);
+  }
+
+  .loading-logo {
+    color: white;
+  }
+}

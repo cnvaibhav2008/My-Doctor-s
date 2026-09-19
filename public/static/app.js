@@ -84,14 +84,17 @@ function showPage(page) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  // Highlight nav
+  // Highlight top nav
   $$('.nav-link').forEach(l => {
     if (l.getAttribute('onclick')?.includes(`'${page}'`)) l.classList.add('active');
   });
 
+  // Sync bottom nav active state
+  syncBottomNav(page);
+
   // Close mobile menu
-  $('navMenu').classList.remove('open');
-  $('hamburger').classList.remove('active');
+  $('navMenu')?.classList.remove('open');
+  $('hamburger')?.classList.remove('active');
 
   // Lazy load
   if (page === 'findDoctors') loadDoctors();
@@ -99,6 +102,26 @@ function showPage(page) {
   if (page === 'nearby') loadNearbyServices();
   if (page === 'dashboard') loadDashboard();
   if (page === 'profile') loadProfile();
+}
+
+// ─── BOTTOM NAV SYNC ──────────────────────────────────
+const PAGE_TO_BOTTOM_NAV = {
+  home: 'bnHome',
+  findDoctors: 'bnDoctors',
+  aiChecker: 'bnAI',
+  appointments: 'bnAppts',
+  chat: 'bnChat',
+};
+
+function syncBottomNav(page) {
+  $$('.bottom-nav-item').forEach(b => b.classList.remove('active'));
+  const id = PAGE_TO_BOTTOM_NAV[page];
+  if (id) $(`${id}`)?.classList.add('active');
+}
+
+function setBottomNav(id) {
+  $$('.bottom-nav-item').forEach(b => b.classList.remove('active'));
+  $(id)?.classList.add('active');
 }
 
 function toggleMenu() {
@@ -1908,4 +1931,125 @@ window.addEventListener('DOMContentLoaded', async () => {
   setInterval(checkMedicationReminders, 5 * 60 * 1000);
   // Initial check after 10 seconds (after session is restored)
   setTimeout(checkMedicationReminders, 10000);
+
+  // ── PWA: Handle ?page= deep-link shortcuts ──
+  handlePWADeepLink();
+
+  // ── PWA: Register Service Worker ──
+  registerServiceWorker();
+
+  // ── PWA: Offline/Online detection ──
+  initOfflineDetection();
 });
+
+// ─── PWA DEEP LINK ────────────────────────────────────
+function handlePWADeepLink() {
+  const params = new URLSearchParams(window.location.search);
+  const page = params.get('page');
+  const validPages = ['home', 'findDoctors', 'aiChecker', 'appointments', 'nearby', 'chat', 'dashboard', 'profile'];
+  if (page && validPages.includes(page)) {
+    // Small delay so app finishes loading first
+    setTimeout(() => showPage(page), 300);
+  }
+}
+
+// ─── SERVICE WORKER REGISTRATION ──────────────────────
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    .then(reg => {
+      console.log('[PWA] Service Worker registered, scope:', reg.scope);
+      // Check for updates
+      reg.addEventListener('updatefound', () => {
+        const worker = reg.installing;
+        if (!worker) return;
+        worker.addEventListener('statechange', () => {
+          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+            showToast('🔄 App updated! Refresh for the latest version.', 'info', 6000);
+          }
+        });
+      });
+    })
+    .catch(err => console.warn('[PWA] SW registration failed:', err));
+}
+
+// ─── PWA INSTALL PROMPT ───────────────────────────────
+let _deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  // Don't show if user dismissed before
+  if (sessionStorage.getItem('pwa-banner-dismissed')) return;
+  // Show banner after 4 seconds
+  setTimeout(() => showInstallBanner(), 4000);
+});
+
+// When app is successfully installed
+window.addEventListener('appinstalled', () => {
+  _deferredInstallPrompt = null;
+  dismissInstallBanner();
+  showToast('🎉 MyDoctor\'s installed successfully!', 'success', 4000);
+});
+
+function showInstallBanner() {
+  const banner = $('pwaInstallBanner');
+  if (banner) {
+    banner.style.display = 'flex';
+  }
+}
+
+function dismissInstallBanner() {
+  const banner = $('pwaInstallBanner');
+  if (banner) {
+    banner.style.animation = 'slideUpBanner 0.3s ease reverse';
+    setTimeout(() => { banner.style.display = 'none'; }, 300);
+  }
+  sessionStorage.setItem('pwa-banner-dismissed', '1');
+}
+
+async function triggerPWAInstall() {
+  if (!_deferredInstallPrompt) {
+    // iOS: show manual instructions
+    if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
+      showToast('📲 Tap the Share button → "Add to Home Screen" to install', 'info', 6000);
+    } else {
+      showToast('💡 Use browser menu → "Install app" or "Add to Home Screen"', 'info', 5000);
+    }
+    dismissInstallBanner();
+    return;
+  }
+  dismissInstallBanner();
+  _deferredInstallPrompt.prompt();
+  const { outcome } = await _deferredInstallPrompt.userChoice;
+  if (outcome === 'accepted') {
+    showToast('🎉 Installing MyDoctor\'s...', 'success', 3000);
+  }
+  _deferredInstallPrompt = null;
+}
+
+// ─── OFFLINE / ONLINE DETECTION ───────────────────────
+function initOfflineDetection() {
+  let offlineEl = null;
+
+  function showOfflineToast() {
+    if (offlineEl) return;
+    offlineEl = document.createElement('div');
+    offlineEl.className = 'offline-toast';
+    offlineEl.innerHTML = '<i class="fas fa-wifi-slash" style="opacity:0.8"></i> You\'re offline — cached content shown';
+    document.body.appendChild(offlineEl);
+  }
+
+  function removeOfflineToast() {
+    if (offlineEl) {
+      offlineEl.remove();
+      offlineEl = null;
+      showToast('✅ Back online!', 'success', 2500);
+    }
+  }
+
+  if (!navigator.onLine) showOfflineToast();
+
+  window.addEventListener('offline', showOfflineToast);
+  window.addEventListener('online', removeOfflineToast);
+}
