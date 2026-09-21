@@ -8,7 +8,7 @@
     {
       "binding": "DB",
       "database_name": "mydoctors-production",
-      "database_id": "local-dev-placeholder"
+      "database_id": "58dbe30c-cb48-4223-a539-ad7d7ff22ee9"
     }
   ]
 }
