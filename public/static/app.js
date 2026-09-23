@@ -284,6 +284,7 @@ async function logout() {
   $('guestActions').style.display = '';
   $('userActions').style.display = 'none';
   $('userDropdown').classList.remove('open');
+  if ($('welcomeStrip')) $('welcomeStrip').style.display = 'none';
   showToast('Logged out successfully', 'info');
   showPage('home');
 }
@@ -301,6 +302,25 @@ function updateNavForUser(user) {
   } else {
     $('avatarFallback').style.display = 'flex';
     $('userAvatarImg').style.display = 'none';
+  }
+  // Update welcome strip on home page
+  updateWelcomeStrip(user);
+}
+
+function updateWelcomeStrip(user) {
+  const strip = $('welcomeStrip');
+  if (!strip) return;
+  if (!user) { strip.style.display = 'none'; return; }
+  strip.style.display = '';
+  const firstName = user.name ? user.name.split(' ')[0] : 'there';
+  const greet = $('welcomeGreeting');
+  if (greet) greet.textContent = `Welcome back, ${firstName}! 👋`;
+  const avatar = $('welcomeAvatar');
+  if (avatar) {
+    const initials = user.name ? user.name.split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
+    avatar.innerHTML = user.profile_image
+      ? `<img src="${user.profile_image}" style="width:100%;height:100%;border-radius:50%;object-fit:cover" onerror="this.outerHTML='${initials}'">`
+      : initials;
   }
 }
 
@@ -370,8 +390,20 @@ function quickSearch(spec) {
 function filterBySpec(spec) {
   showPage('findDoctors');
   setTimeout(() => {
-    $('specFilter').value = spec;
-    searchDoctors();
+    // Map generic spec names to our HD dropdown values
+    const specMap = {
+      'Cardiologist': 'Cardiology', 'Cardiology': 'Cardiology',
+      'Orthopedic': 'Orthopaedics', 'Orthopaedics': 'Orthopaedics',
+      'Neurologist': 'Neuro & Spine Surgery', 'Neuro': 'Neuro & Spine Surgery',
+      'Gynecologist': 'Obstetrics & Gynaecology', 'Obstetrics': 'Obstetrics & Gynaecology',
+      'Paediatrics': 'Paediatrics', 'Nephrologist': 'Nephrology', 'Nephrology': 'Nephrology',
+      'Urologist': 'Urology', 'Urology': 'Urology',
+      'Oncology': 'Surgical Oncology',
+    };
+    const mappedSpec = specMap[spec] || spec;
+    // Use text search since dropdown might not have exact value
+    if ($('doctorSearch')) $('doctorSearch').value = spec;
+    loadDoctors();
   }, 300);
 }
 
@@ -383,26 +415,44 @@ function searchDoctors() {
   doctorSearchTimeout = setTimeout(loadDoctors, 400);
 }
 
+// active city filter for doctors page
+let _doctorCityFilter = '';
+
+function setDoctorCity(city) {
+  _doctorCityFilter = city;
+  // update tab highlight
+  ['dcAll','dcHubballi','dcDharwad'].forEach(id => $$(`.city-tab-btn`).forEach(b => b.classList.remove('active')));
+  const map = {'':'dcAll','Hubballi':'dcHubballi','Dharwad':'dcDharwad'};
+  $(map[city])?.classList.add('active');
+  loadDoctors();
+}
+
 function clearFilters() {
   $('doctorSearch').value = '';
   $('specFilter').value = '';
-  $('cityFilter').value = '';
-  $('sortFilter').value = 'rating';
+  if ($('hospitalFilter')) $('hospitalFilter').value = '';
+  $('sortFilter').value = 'verified';
+  _doctorCityFilter = '';
+  ['dcAll','dcHubballi','dcDharwad'].forEach(id => $(id)?.classList.remove('active'));
+  $('dcAll')?.classList.add('active');
   loadDoctors();
 }
 
 async function loadDoctors() {
   const container = $('doctorsList');
+  if (!container) return;
   container.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Finding doctors...</p></div>';
 
   const search = $('doctorSearch')?.value.trim() || '';
-  const spec = $('specFilter')?.value || '';
-  const city = $('cityFilter')?.value.trim() || '';
+  const spec   = $('specFilter')?.value || '';
+  const hospital = $('hospitalFilter')?.value || '';
+  const city   = _doctorCityFilter || '';
 
-  let url = '/api/doctors?limit=50';
-  if (search) url += `&search=${encodeURIComponent(search)}`;
-  if (spec) url += `&specialization=${encodeURIComponent(spec)}`;
-  if (city) url += `&city=${encodeURIComponent(city)}`;
+  let url = '/api/doctors?limit=80';
+  if (search)   url += `&search=${encodeURIComponent(search)}`;
+  if (spec)     url += `&specialization=${encodeURIComponent(spec)}`;
+  if (hospital) url += `&hospital=${encodeURIComponent(hospital)}`;
+  if (city)     url += `&city=${encodeURIComponent(city)}`;
 
   const res = await apiCall(url);
   if (!res.ok || !res.data.success) {
@@ -411,16 +461,17 @@ async function loadDoctors() {
   }
 
   let doctors = res.data.doctors;
-  const sort = $('sortFilter')?.value || 'rating';
-  if (sort === 'rating') doctors.sort((a, b) => b.rating - a.rating);
-  else if (sort === 'experience') doctors.sort((a, b) => b.experience_years - a.experience_years);
-  else if (sort === 'fee_low') doctors.sort((a, b) => a.consultation_fee - b.consultation_fee);
-  else if (sort === 'fee_high') doctors.sort((a, b) => b.consultation_fee - a.consultation_fee);
+  const sort = $('sortFilter')?.value || 'verified';
+  if (sort === 'experience') doctors.sort((a, b) => (b.experience_years||0) - (a.experience_years||0));
+  else if (sort === 'fee_low') doctors.sort((a, b) => (a.consultation_fee||0) - (b.consultation_fee||0));
+  else if (sort === 'fee_high') doctors.sort((a, b) => (b.consultation_fee||0) - (a.consultation_fee||0));
+  else doctors.sort((a, b) => (b.is_verified||0) - (a.is_verified||0) || (b.rating||0) - (a.rating||0));
 
-  $('resultsInfo').textContent = `Found ${doctors.length} doctor${doctors.length !== 1 ? 's' : ''}`;
+  const ri = $('resultsInfo');
+  if (ri) ri.textContent = `${doctors.length} doctor${doctors.length !== 1 ? 's' : ''} found${city ? ` in ${city}` : ' in Hubballi–Dharwad'}`;
 
   if (doctors.length === 0) {
-    container.innerHTML = '<div class="empty-state"><i class="fas fa-user-md"></i><h3>No doctors found</h3><p>Try adjusting your search filters</p></div>';
+    container.innerHTML = '<div class="empty-state"><i class="fas fa-user-md"></i><h3>No doctors found</h3><p>Try adjusting your filters</p></div>';
     return;
   }
 
@@ -428,37 +479,124 @@ async function loadDoctors() {
 }
 
 function renderDoctorListCard(doc) {
-  const initials = doc.name.split(' ').map(n => n[0]).join('').substring(0, 2);
-  const avatarContent = doc.profile_image
-    ? `<img src="${doc.profile_image}" alt="${doc.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${initials}`
-    : `<div style="width:100%;height:100%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;color:white;font-size:2rem;font-weight:700;border-radius:12px">${initials}</div>`;
+  const initials = doc.name.split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  const verified = doc.is_verified ? `<span class="verified-badge"><i class="fas fa-check-circle"></i> Verified</span>` : '';
+  const expText  = doc.experience_years ? `<span class="dc-meta-pill"><i class="fas fa-briefcase"></i> ${doc.experience_years} yrs</span>` : '';
+  const feeText  = doc.consultation_fee ? `<span class="dc-meta-pill fee-pill">₹${doc.consultation_fee}</span>` : '';
+  const qualText = doc.qualification ? `<span class="dc-meta-pill"><i class="fas fa-graduation-cap"></i> ${doc.qualification}</span>` : '';
+  const locText  = (doc.area || doc.city) ? `<span class="dc-meta-pill"><i class="fas fa-map-marker-alt"></i> ${doc.area || doc.city}</span>` : '';
+  const schedPill = getOpdSummary(doc);
 
   return `
-  <div class="doctor-list-card" onclick="showDoctorDetail(${doc.id})">
-    <div class="doctor-list-avatar">${avatarContent}</div>
-    <div class="doctor-list-info">
-      <h3>${doc.name} ${doc.is_verified ? '<span class="verified-badge"><i class="fas fa-check"></i> Verified</span>' : ''}</h3>
-      <div class="doctor-list-spec"><i class="fas fa-stethoscope"></i> ${doc.specialization}</div>
-      <div class="doctor-list-hospital"><i class="fas fa-hospital"></i> ${doc.hospital_name || 'Private Clinic'}, ${doc.city || ''}</div>
-      <div class="doctor-list-meta">
-        <div class="doctor-list-meta-item">${generateStars(doc.rating || 0)} <span>${(doc.rating || 0).toFixed(1)} (${doc.total_ratings || 0})</span></div>
-        <div class="doctor-list-meta-item"><i class="fas fa-briefcase"></i> ${doc.experience_years || 0} yrs exp</div>
-        <div class="doctor-list-meta-item"><i class="fas fa-graduation-cap"></i> ${doc.qualification || 'MBBS'}</div>
-        ${doc.city ? `<div class="doctor-list-meta-item"><i class="fas fa-map-marker-alt"></i> ${doc.city}</div>` : ''}
+  <div class="doctor-list-card hd-doc-card">
+    <div class="hd-doc-avatar">${initials}</div>
+    <div class="hd-doc-body">
+      <div class="hd-doc-name-row">
+        <h3 class="hd-doc-name">${doc.name}</h3>
+        ${verified}
       </div>
-      <div class="doctor-tags" style="margin-top:8px">
-        ${(doc.diseases_treated || []).slice(0, 4).map(d => `<span class="doctor-tag">${d}</span>`).join('')}
+      <div class="hd-doc-spec"><i class="fas fa-stethoscope"></i> ${doc.specialization}${doc.sub_specializations && doc.sub_specializations.length ? ' · ' + doc.sub_specializations[0] : ''}</div>
+      <div class="hd-doc-hospital"><i class="fas fa-hospital-alt"></i> ${doc.hospital_name}${doc.city ? ', ' + doc.city : ''}</div>
+      <div class="hd-doc-pills">
+        ${expText}${qualText}${feeText}${locText}
+        ${schedPill}
       </div>
     </div>
-    <div class="doctor-list-actions">
-      <div class="doctor-list-fee">
-        <div class="fee-amount">₹${doc.consultation_fee || 0}</div>
-        <div class="fee-label">Consultation</div>
-      </div>
-      <button class="btn-view-profile" onclick="event.stopPropagation();showDoctorDetail(${doc.id})"><i class="fas fa-eye"></i> View</button>
-      <button class="btn-book-list" onclick="event.stopPropagation();openBooking(${doc.id})"><i class="fas fa-calendar-plus"></i> Book</button>
+    <div class="hd-doc-actions">
+      <button class="btn-hd-view" onclick="event.stopPropagation();showDoctorProfile(${doc.id})"><i class="fas fa-user-md"></i> View Profile</button>
+      <button class="btn-hd-book" onclick="event.stopPropagation();openBooking(${doc.id})"><i class="fas fa-calendar-plus"></i> Book</button>
     </div>
   </div>`;
+}
+
+function getOpdSummary(doc) {
+  // Try opd_schedule from doctor_hospital_links
+  if (doc.opd_schedule && doc.opd_schedule.length) {
+    try {
+      const s = typeof doc.opd_schedule === 'string' ? JSON.parse(doc.opd_schedule) : doc.opd_schedule;
+      if (s && s.length && s[0].days) {
+        return `<span class="dc-meta-pill opd-pill"><i class="fas fa-clock"></i> OPD: ${s[0].days.join(',')} ${s[0].time||''}</span>`;
+      }
+    } catch(e){}
+  }
+  if (doc.opd_schedule && typeof doc.opd_schedule === 'string' && doc.opd_schedule !== '[]') {
+    return `<span class="dc-meta-pill opd-pill"><i class="fas fa-clock"></i> ${doc.opd_schedule}</span>`;
+  }
+  return '';
+}
+
+async function showDoctorProfile(doctorId) {
+  openModal('doctorProfileModal');
+  const content = $('doctorProfileContent');
+  content.innerHTML = '<div class="loading-state" style="padding:60px 20px"><div class="spinner"></div><p>Loading profile...</p></div>';
+
+  const res = await apiCall(`/api/doctors/${doctorId}`);
+  if (!res.ok || !res.data.success) {
+    content.innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-user-md"></i><h3>Profile not found</h3></div>';
+    return;
+  }
+
+  const doc = res.data.doctor;
+  const links = doc.hospital_links || [];
+  const reviews = res.data.reviews || [];
+
+  // Build OPD schedule HTML from doctor_hospital_links
+  let opdHtml = '';
+  if (links.length) {
+    opdHtml = `<div class="dp-section"><h4><i class="fas fa-clock"></i> OPD Schedule</h4><ul class="dp-opd-list">`;
+    links.forEach(l => {
+      const days = Array.isArray(l.opd_days) ? l.opd_days.join(', ') : (l.opd_days || '');
+      opdHtml += `<li><strong>${l.h_name || 'Hospital'}</strong> — ${days}${l.opd_times ? ' · ' + l.opd_times : ''}${l.department ? ' (' + l.department + ')' : ''}</li>`;
+    });
+    opdHtml += `</ul></div>`;
+  }
+
+  const row = (label, val, icon='') => val ? `<div class="dp-row"><span class="dp-label">${icon ? '<i class="fas fa-'+icon+'"></i> ' : ''}${label}</span><span class="dp-val">${val}</span></div>` : '';
+  const tags = (arr) => arr && arr.length ? arr.map(t => `<span class="doctor-tag">${t}</span>`).join('') : '';
+  const awardsHtml = doc.awards && doc.awards.length ? `<div class="dp-section"><h4><i class="fas fa-award"></i> Awards &amp; Fellowships</h4><ul class="dp-list">${doc.awards.map(a => `<li>${a}</li>`).join('')}</ul></div>` : '';
+  const diseasesHtml = doc.diseases_treated && doc.diseases_treated.length ? `<div class="dp-section"><h4><i class="fas fa-stethoscope"></i> Conditions Treated</h4><div class="doctor-tags">${tags(doc.diseases_treated)}</div></div>` : '';
+  const langHtml = doc.languages && doc.languages.length ? row('Languages', doc.languages.join(', '), 'language') : '';
+  const regHtml = doc.kmc_reg_number ? row('Medical Registration', doc.kmc_reg_number, 'id-card') : '';
+  const bioHtml = doc.bio ? `<div class="dp-section"><h4><i class="fas fa-user"></i> About</h4><p class="dp-bio">${doc.bio}</p></div>` : '';
+  const reviewsHtml = reviews.length ? `<div class="dp-section"><h4><i class="fas fa-star"></i> Patient Reviews</h4>${reviews.map(r => `<div class="dp-review"><div class="dp-review-name">${r.patient_name}</div><div>${generateStars(r.rating)} <span style="font-size:0.8rem;color:var(--light)">${r.created_at ? r.created_at.slice(0,10) : ''}</span></div><p style="margin:4px 0 0;font-size:0.9rem">${r.comment||''}</p></div>`).join('')}</div>` : '';
+
+  // Primary hospital details for map/call
+  const primaryLink = links.find(l => l.is_primary) || links[0];
+  const actionsHtml = `<div class="dp-actions">
+    ${doc.hospital_phone ? `<a href="tel:${doc.hospital_phone}" class="btn-call"><i class="fas fa-phone"></i> Call Hospital</a>` : ''}
+    <button class="btn-hd-book" onclick="closeModal('doctorProfileModal');openBooking(${doc.id})"><i class="fas fa-calendar-plus"></i> Book Appointment</button>
+    ${primaryLink && primaryLink.h_maps_url ? `<a href="${primaryLink.h_maps_url}" target="_blank" class="btn-directions"><i class="fas fa-directions"></i> Directions</a>` : (doc.hospital_maps_url ? `<a href="${doc.hospital_maps_url}" target="_blank" class="btn-directions"><i class="fas fa-directions"></i> Directions</a>` : '')}
+  </div>`;
+
+  content.innerHTML = `
+    <div class="doctor-profile-modal-inner">
+      <div class="dp-header">
+        <div class="dp-avatar">${doc.name.split(' ').filter(Boolean).map(n=>n[0]).join('').substring(0,2).toUpperCase()}</div>
+        <div class="dp-header-info">
+          <h2>${doc.name} ${doc.is_verified ? '<span class="verified-badge"><i class="fas fa-check-circle"></i> Verified</span>' : ''}</h2>
+          <div class="dp-spec">${doc.specialization}${doc.sub_specializations && doc.sub_specializations.length ? ' · ' + doc.sub_specializations.join(', ') : ''}</div>
+          <div class="dp-hospital"><i class="fas fa-hospital-alt"></i> ${doc.hospital_name}${doc.city ? ', ' + doc.city : ''}</div>
+        </div>
+      </div>
+      <div class="dp-pills">
+        ${doc.experience_years ? `<span class="dc-meta-pill"><i class="fas fa-briefcase"></i> ${doc.experience_years} yrs experience</span>` : ''}
+        ${doc.qualification ? `<span class="dc-meta-pill"><i class="fas fa-graduation-cap"></i> ${doc.qualification}</span>` : ''}
+        ${doc.consultation_fee ? `<span class="dc-meta-pill fee-pill">₹${doc.consultation_fee} consultation</span>` : ''}
+        ${doc.online_consultation ? `<span class="dc-meta-pill online-pill"><i class="fas fa-video"></i> Online Available</span>` : ''}
+        ${doc.rating ? `<span class="dc-meta-pill">${generateStars(doc.rating)} ${doc.rating} (${doc.total_ratings||0})</span>` : ''}
+      </div>
+      <div class="dp-details">
+        ${bioHtml}
+        ${opdHtml}
+        ${diseasesHtml}
+        ${doc.languages && doc.languages.length ? `<div class="dp-section"><h4><i class="fas fa-language"></i> Languages</h4><p>${doc.languages.join(', ')}</p></div>` : ''}
+        ${regHtml ? `<div class="dp-section">${regHtml}</div>` : ''}
+        ${awardsHtml}
+        ${reviewsHtml}
+      </div>
+      ${actionsHtml}
+      <div class="dp-verified-stamp"><i class="fas fa-shield-alt"></i> Information source: Official/verified source &nbsp;·&nbsp; Last researched: ${doc.last_verified || 'September 2026'}</div>
+    </div>`;
 }
 
 function renderDoctorCard(doc) {
@@ -807,81 +945,151 @@ function switchNearbyTab(tab, btn) {
   $(`tab-${tab}`).classList.add('active');
 }
 
+let _nearbyCity = '';
+let _nearbyHospitals = [];
+
 async function loadNearbyServices(city = '') {
-  if (state.nearbyLoaded && !city) return;
-  const url = `/api/nearby/hospitals${city ? `?city=${encodeURIComponent(city)}` : ''}`;
+  _nearbyCity = city;
+  // Update city tab styles
+  ['ncAll','ncHubballi','ncDharwad'].forEach(id => $(id)?.classList.remove('active'));
+  const cityMap = {'':'ncAll','Hubballi':'ncHubballi','Dharwad':'ncDharwad'};
+  $(cityMap[city])?.classList.add('active');
+
+  const container = $('hospitalsList');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading hospitals...</p></div>';
+
+  let url = `/api/hospitals?limit=30`;
+  if (city) url += `&city=${encodeURIComponent(city)}`;
+  const emerg = $('emergencyFilter')?.checked;
+  if (emerg) url += `&emergency=1`;
+  const search = $('hospitalSearch')?.value.trim();
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  const type = $('hospitalTypeFilter')?.value;
+  if (type) url += `&type=${encodeURIComponent(type)}`;
+
   const res = await apiCall(url);
-  if (!res.ok || !res.data.success) return;
+  if (!res.ok || !res.data.success) {
+    container.innerHTML = '<div class="empty-state"><i class="fas fa-hospital"></i><h3>Could not load hospitals</h3></div>';
+    return;
+  }
 
-  state.nearbyLoaded = true;
-  const { hospitals, scanCentres, pharmacies } = res.data;
-  renderHospitals(hospitals);
-  renderDiagnostics(scanCentres);
-  renderPharmacies(pharmacies);
+  _nearbyHospitals = res.data.hospitals;
+  const ri = $('hospitalResultsInfo');
+  if (ri) ri.textContent = `${_nearbyHospitals.length} hospital${_nearbyHospitals.length !== 1 ? 's' : ''} found${city ? ' in ' + city : ' in Hubballi–Dharwad'}`;
+
+  if (_nearbyHospitals.length === 0) {
+    container.innerHTML = '<div class="empty-state"><i class="fas fa-hospital"></i><h3>No hospitals found</h3><p>Try changing your filters</p></div>';
+    return;
+  }
+
+  container.innerHTML = _nearbyHospitals.map(h => renderHospitalCard(h)).join('');
 }
 
-function renderHospitals(hospitals) {
-  $('hospitalsList').innerHTML = hospitals.map(h => `
-    <div class="nearby-card">
-      <div class="nearby-card-top">
-        <div class="nearby-icon hospital"><i class="fas fa-hospital"></i></div>
-        <div>
-          <div class="nearby-name">${h.name}</div>
-          <div class="nearby-type">${h.type}</div>
-          <div class="nearby-distance"><i class="fas fa-map-marker-alt"></i> ${h.distance}</div>
-        </div>
-      </div>
-      <div class="nearby-rating-row">${generateStars(h.rating)}<span style="font-size:0.82rem;color:var(--light)">${h.rating} Rating</span></div>
-      ${h.emergency ? '<div class="nearby-badges"><span class="badge-emergency">🚨 24/7 Emergency</span></div>' : ''}
-      <div class="nearby-services-tags">${(h.specialties || []).map(s => `<span class="nearby-service-tag">${s}</span>`).join('')}</div>
-      <div class="nearby-actions">
-        <a href="tel:${h.phone}" class="btn-call"><i class="fas fa-phone"></i> Call</a>
-        <button class="btn-directions" onclick="openDirections('${h.name}')"><i class="fas fa-directions"></i> Directions</button>
-      </div>
-    </div>
-  `).join('');
+let _hospitalSearchTimeout = null;
+function searchHospitals() {
+  clearTimeout(_hospitalSearchTimeout);
+  _hospitalSearchTimeout = setTimeout(() => loadNearbyServices(_nearbyCity), 400);
 }
 
-function renderDiagnostics(centres) {
-  $('diagnosticList').innerHTML = centres.map(c => `
-    <div class="nearby-card">
-      <div class="nearby-card-top">
-        <div class="nearby-icon diagnostic"><i class="fas fa-microscope"></i></div>
-        <div>
-          <div class="nearby-name">${c.name}</div>
-          <div class="nearby-type">${c.type}</div>
-          <div class="nearby-distance"><i class="fas fa-map-marker-alt"></i> ${c.distance}</div>
-        </div>
+function renderHospitalCard(h) {
+  const specs = (h.specialties || []).slice(0, 4).map(s => `<span class="nearby-service-tag">${s}</span>`).join('');
+  const emergBadge = h.emergency ? `<span class="badge-emergency">🚨 24/7 Emergency</span>` : '';
+  const typeIcon = h.type === 'Government' ? 'fa-landmark' : h.type === 'Trust' ? 'fa-hands-helping' : 'fa-hospital';
+  const areaText = h.area ? `, ${h.area}` : '';
+  const ratingHtml = h.rating ? `<div class="nearby-rating-row" style="margin-top:6px">${generateStars(h.rating)}<span style="font-size:0.82rem;color:var(--light);margin-left:4px">${h.rating}</span></div>` : '';
+  const phoneHtml = h.phone ? `<a href="tel:${h.phone}" class="btn-call"><i class="fas fa-phone"></i> Call</a>` : '';
+  const mapsHtml = h.google_maps_url ? `<a href="${h.google_maps_url}" target="_blank" class="btn-directions"><i class="fas fa-directions"></i> Directions</a>` : `<button class="btn-directions" onclick="openDirections('${h.name}')"><i class="fas fa-directions"></i> Directions</button>`;
+
+  return `
+  <div class="hd-hospital-card">
+    <div class="hd-hospital-top">
+      <div class="hd-hospital-icon-wrap">
+        <div class="nearby-icon hospital"><i class="fas ${typeIcon}"></i></div>
+        ${emergBadge}
       </div>
-      <div class="nearby-rating-row">${generateStars(c.rating)}<span style="font-size:0.82rem;color:var(--light)">${c.rating} Rating</span></div>
-      <div class="nearby-services-tags">${(c.services || []).map(s => `<span class="nearby-service-tag">${s}</span>`).join('')}</div>
-      <div class="nearby-actions">
-        <a href="tel:${c.phone}" class="btn-call"><i class="fas fa-phone"></i> Call</a>
-        <button class="btn-directions" onclick="openDirections('${c.name}')"><i class="fas fa-directions"></i> Directions</button>
+      <div class="hd-hospital-header-info">
+        <div class="hd-hospital-name">${h.name}</div>
+        <div class="hd-hospital-type"><i class="fas fa-tag"></i> ${h.type} · ${h.category || 'Hospital'}</div>
+        <div class="hd-hospital-loc"><i class="fas fa-map-marker-alt"></i> ${h.city}${areaText}</div>
       </div>
     </div>
-  `).join('');
+    ${ratingHtml}
+    <div class="nearby-services-tags" style="margin:8px 0">${specs}</div>
+    <div class="hd-hospital-actions">
+      ${phoneHtml}
+      <button class="btn-hd-view" onclick="showHospitalProfile(${h.id})"><i class="fas fa-info-circle"></i> View Hospital</button>
+      <button class="btn-hd-book" onclick="showPage('findDoctors');setDoctorCity('${h.city}')"><i class="fas fa-user-md"></i> Find Doctors</button>
+      ${mapsHtml}
+    </div>
+  </div>`;
 }
 
-function renderPharmacies(pharmacies) {
-  $('pharmacyList').innerHTML = pharmacies.map(p => `
-    <div class="nearby-card">
-      <div class="nearby-card-top">
-        <div class="nearby-icon pharmacy"><i class="fas fa-pills"></i></div>
+async function showHospitalProfile(hospitalId) {
+  openModal('hospitalProfileModal');
+  const content = $('hospitalProfileContent');
+  content.innerHTML = '<div class="loading-state" style="padding:60px 20px"><div class="spinner"></div><p>Loading hospital profile...</p></div>';
+
+  const res = await apiCall(`/api/hospitals/${hospitalId}`);
+  if (!res.ok || !res.data.success) {
+    content.innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-hospital"></i><h3>Hospital not found</h3></div>';
+    return;
+  }
+
+  const h = res.data.hospital;
+  const doctors = res.data.doctors || [];
+
+  const specs = (h.specialties || []).map(s => `<span class="nearby-service-tag">${s}</span>`).join('');
+  const facilities = (h.facilities || []).map(f => `<span class="dc-meta-pill"><i class="fas fa-check"></i> ${f}</span>`).join('');
+
+  const doctorsHtml = doctors.length ? `
+    <div class="dp-section">
+      <h4><i class="fas fa-user-md"></i> Doctors at This Hospital</h4>
+      <div class="hp-doctors-list">
+        ${doctors.map(d => `
+          <div class="hp-doc-row" onclick="closeModal('hospitalProfileModal');showDoctorProfile(${d.id})">
+            <div class="hp-doc-avatar">${d.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase()}</div>
+            <div>
+              <div class="hp-doc-name">${d.name} ${d.is_verified ? '<i class="fas fa-check-circle" style="color:var(--primary);font-size:0.75rem"></i>' : ''}</div>
+              <div class="hp-doc-spec" style="font-size:0.82rem;color:var(--light)">${d.specialization}${d.opd_days && d.opd_days.length ? ' · OPD: ' + d.opd_days.join(',') : ''}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>` : '';
+
+  const phoneHtml = h.phone ? `<a href="tel:${h.phone}" class="btn-call"><i class="fas fa-phone"></i> ${h.phone}</a>` : '';
+  const websiteHtml = h.website ? `<a href="${h.website}" target="_blank" class="btn-directions" style="text-decoration:none"><i class="fas fa-globe"></i> Website</a>` : '';
+  const mapsHtml = h.google_maps_url ? `<a href="${h.google_maps_url}" target="_blank" class="btn-directions"><i class="fas fa-directions"></i> Directions</a>` : `<button class="btn-directions" onclick="openDirections('${h.name}')"><i class="fas fa-directions"></i> Get Directions</button>`;
+
+  content.innerHTML = `
+    <div class="hospital-profile-inner">
+      <div class="hp-header">
+        <div class="hp-header-icon"><i class="fas fa-hospital-alt"></i></div>
         <div>
-          <div class="nearby-name">${p.name}</div>
-          <div class="nearby-type">${p.type}</div>
-          <div class="nearby-distance"><i class="fas fa-map-marker-alt"></i> ${p.distance}</div>
+          <h2>${h.name}${h.short_name ? ` <small>(${h.short_name})</small>` : ''}</h2>
+          <div class="hp-type-city">${h.type} · ${h.category || ''} · <i class="fas fa-map-marker-alt"></i> ${h.city}${h.area ? ', ' + h.area : ''}</div>
+          ${h.emergency ? '<span class="badge-emergency" style="margin-top:6px;display:inline-block">🚨 24/7 Emergency</span>' : ''}
+          ${h.accreditation ? `<span class="dc-meta-pill" style="margin-left:6px"><i class="fas fa-certificate"></i> ${h.accreditation}</span>` : ''}
         </div>
       </div>
-      <div class="nearby-rating-row">${generateStars(p.rating)}<span style="font-size:0.82rem;color:var(--light)">${p.rating} Rating</span></div>
-      ${p.open24 ? '<div class="nearby-badges"><span class="badge-open24">🟢 Open 24/7</span></div>' : '<div class="nearby-badges"><span style="background:#FEF3C7;color:#D97706;padding:3px 10px;border-radius:20px;font-size:0.72px;font-weight:700">⏰ Regular Hours</span></div>'}
-      <div class="nearby-actions">
-        <a href="tel:${p.phone}" class="btn-call"><i class="fas fa-phone"></i> Call</a>
-        <button class="btn-directions" onclick="openDirections('${p.name}')"><i class="fas fa-directions"></i> Directions</button>
+      ${h.rating ? `<div class="hp-rating-row">${generateStars(h.rating)} <span>${h.rating} rating</span></div>` : ''}
+      ${h.description ? `<p class="hp-desc">${h.description}</p>` : ''}
+      <div class="dp-section">
+        <h4><i class="fas fa-info-circle"></i> Details</h4>
+        ${h.address ? `<div class="dp-row"><i class="fas fa-map-marker-alt"></i> ${h.address}${h.pincode ? ' – ' + h.pincode : ''}</div>` : ''}
+        ${h.opd_timings ? `<div class="dp-row"><i class="fas fa-clock"></i> OPD: ${h.opd_timings}</div>` : ''}
+        ${h.bed_count ? `<div class="dp-row"><i class="fas fa-bed"></i> ${h.bed_count} beds</div>` : ''}
+        ${h.established_year ? `<div class="dp-row"><i class="fas fa-calendar-alt"></i> Est. ${h.established_year}</div>` : ''}
+        ${h.icu_available ? `<div class="dp-row"><i class="fas fa-procedures"></i> ICU Available</div>` : ''}
+        ${h.blood_bank ? `<div class="dp-row"><i class="fas fa-tint"></i> Blood Bank</div>` : ''}
+        ${h.ambulance ? `<div class="dp-row"><i class="fas fa-ambulance"></i> Ambulance</div>` : ''}
       </div>
-    </div>
-  `).join('');
+      ${h.specialties && h.specialties.length ? `<div class="dp-section"><h4><i class="fas fa-stethoscope"></i> Specialties</h4><div class="nearby-services-tags">${specs}</div></div>` : ''}
+      ${h.facilities && h.facilities.length ? `<div class="dp-section"><h4><i class="fas fa-tools"></i> Facilities</h4><div class="hd-facilities-wrap">${facilities}</div></div>` : ''}
+      ${doctorsHtml}
+      <div class="dp-actions">${phoneHtml}${websiteHtml}${mapsHtml}</div>
+      <div class="dp-verified-stamp"><i class="fas fa-shield-alt"></i> Information source: ${h.source || 'Official/verified source'} &nbsp;·&nbsp; Last researched: ${h.last_verified || 'September 2026'}</div>
+    </div>`;
 }
 
 function detectLocation() {

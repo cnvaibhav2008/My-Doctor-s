@@ -1867,3 +1867,223 @@ button:focus-visible, a:focus-visible {
     color: white;
   }
 }
+
+/* ═══════════════════════════════════════════════════════
+   HD DIRECTORY — Doctor & Hospital Cards + Modals
+═══════════════════════════════════════════════════════ */
+
+/* City tab buttons */
+.city-tab-btn {
+  padding: 7px 18px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.city-tab-btn.active,
+.city-tab-btn:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* HD Doctor card */
+.hd-doc-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  background: var(--card-bg);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.hd-doc-card:hover { box-shadow: 0 4px 20px rgba(99,102,241,0.12); transform: translateY(-1px); }
+.hd-doc-avatar {
+  width: 52px; height: 52px; min-width: 52px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 1.2rem; font-weight: 700;
+  flex-shrink: 0;
+}
+.hd-doc-body { flex: 1; min-width: 0; }
+.hd-doc-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hd-doc-name { font-size: 1rem; font-weight: 700; margin: 0; color: var(--text); }
+.hd-doc-spec { font-size: 0.83rem; color: var(--primary); font-weight: 600; margin: 3px 0; }
+.hd-doc-hospital { font-size: 0.82rem; color: var(--light); margin-bottom: 6px; }
+.hd-doc-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.hd-doc-actions { display: flex; flex-direction: column; gap: 6px; min-width: 110px; flex-shrink: 0; }
+
+/* HD meta pills */
+.dc-meta-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 20px;
+  background: var(--surface); color: var(--light);
+  font-size: 0.75rem; font-weight: 600;
+  border: 1px solid var(--border);
+}
+.fee-pill { background: #ECFDF5; color: #059669; border-color: #BBF7D0; }
+.opd-pill { background: #EEF2FF; color: #4F46E5; border-color: #C7D2FE; }
+.online-pill { background: #F0F9FF; color: #0369A1; border-color: #BAE6FD; }
+[data-theme="dark"] .fee-pill { background: #064E3B; color: #6EE7B7; border-color: #065F46; }
+[data-theme="dark"] .opd-pill { background: #1E1B4B; color: #A5B4FC; border-color: #312E81; }
+[data-theme="dark"] .online-pill { background: #0C4A6E; color: #7DD3FC; border-color: #0369A1; }
+
+/* Doctor action buttons */
+.btn-hd-view {
+  padding: 7px 12px; border-radius: 8px;
+  background: var(--surface); border: 1.5px solid var(--primary);
+  color: var(--primary); font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-hd-view:hover { background: var(--primary); color: #fff; }
+.btn-hd-book {
+  padding: 7px 12px; border-radius: 8px;
+  background: var(--primary); border: none;
+  color: #fff; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-hd-book:hover { background: var(--secondary); }
+
+/* ── Doctor Profile Modal ── */
+.doctor-profile-modal-inner { padding: 20px; }
+.dp-header { display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-start; }
+.dp-avatar {
+  width: 64px; height: 64px; min-width: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 1.5rem; font-weight: 700;
+}
+.dp-header-info h2 { margin: 0 0 4px; font-size: 1.15rem; }
+.dp-spec { font-size: 0.88rem; color: var(--primary); font-weight: 600; margin-bottom: 3px; }
+.dp-hospital { font-size: 0.82rem; color: var(--light); }
+.dp-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 16px; }
+.dp-details { margin-bottom: 12px; }
+.dp-section { margin-bottom: 16px; }
+.dp-section h4 { font-size: 0.9rem; font-weight: 700; margin: 0 0 8px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.dp-row { font-size: 0.85rem; color: var(--light); margin-bottom: 4px; display: flex; gap: 8px; align-items: flex-start; }
+.dp-label { font-weight: 600; color: var(--text); min-width: 110px; }
+.dp-val { color: var(--light); }
+.dp-bio { font-size: 0.88rem; color: var(--light); line-height: 1.6; margin: 0; }
+.dp-opd-list { margin: 0; padding-left: 16px; font-size: 0.85rem; color: var(--light); line-height: 1.8; }
+.dp-list { margin: 0; padding-left: 16px; font-size: 0.85rem; color: var(--light); line-height: 1.8; }
+.dp-review { background: var(--surface); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+.dp-review-name { font-weight: 700; font-size: 0.88rem; margin-bottom: 3px; }
+.dp-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.dp-verified-stamp { font-size: 0.75rem; color: var(--light); margin-top: 12px; padding: 8px; background: var(--surface); border-radius: 8px; }
+
+/* ── HD Hospital Cards ── */
+.hd-hospital-card {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px; margin-bottom: 10px;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.hd-hospital-card:hover { box-shadow: 0 4px 20px rgba(99,102,241,0.10); transform: translateY(-1px); }
+.hd-hospital-top { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 8px; }
+.hd-hospital-icon-wrap { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.hd-hospital-name { font-size: 1rem; font-weight: 700; color: var(--text); }
+.hd-hospital-type { font-size: 0.8rem; color: var(--primary); font-weight: 600; margin: 2px 0; }
+.hd-hospital-loc { font-size: 0.8rem; color: var(--light); }
+.hd-hospital-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.hd-facilities-wrap { display: flex; flex-wrap: wrap; gap: 5px; }
+
+/* ── Hospital Profile Modal ── */
+.hospital-profile-inner { padding: 20px; }
+.hp-header { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 12px; }
+.hp-header-icon {
+  width: 56px; height: 56px; border-radius: 14px;
+  background: linear-gradient(135deg, #00b894, #00cec9);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 1.4rem; flex-shrink: 0;
+}
+.hp-type-city { font-size: 0.82rem; color: var(--light); margin-top: 3px; }
+.hp-rating-row { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; margin-bottom: 10px; }
+.hp-desc { font-size: 0.88rem; color: var(--light); line-height: 1.6; margin-bottom: 14px; }
+.hp-doctors-list { display: flex; flex-direction: column; gap: 8px; }
+.hp-doc-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px; border-radius: 10px;
+  background: var(--surface); cursor: pointer;
+  transition: background 0.15s;
+}
+.hp-doc-row:hover { background: var(--border); }
+.hp-doc-avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 0.85rem; font-weight: 700; flex-shrink: 0;
+}
+.hp-doc-name { font-size: 0.9rem; font-weight: 600; }
+
+/* ── Welcome Strip ── */
+.welcome-strip {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  padding: 14px 0; color: #fff;
+}
+.welcome-strip-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.welcome-left { display: flex; align-items: center; gap: 12px; }
+.welcome-avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; font-weight: 700; flex-shrink: 0;
+  overflow: hidden;
+}
+.welcome-greeting { font-size: 1.05rem; font-weight: 700; }
+.welcome-sub { font-size: 0.8rem; opacity: 0.85; }
+.welcome-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-welcome-action {
+  padding: 7px 14px; border-radius: 20px;
+  background: rgba(255,255,255,0.2); border: 1.5px solid rgba(255,255,255,0.4);
+  color: #fff; font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; transition: background 0.2s;
+}
+.btn-welcome-action:hover { background: rgba(255,255,255,0.35); }
+.btn-welcome-action.secondary { background: #fff; color: var(--primary); border-color: #fff; }
+.btn-welcome-action.secondary:hover { background: rgba(255,255,255,0.9); }
+
+/* ── Quick Feature Cards ── */
+.quick-features-section { padding: 60px 0 20px; }
+.quick-features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+.quick-feature-card {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 14px; padding: 20px 16px;
+  text-align: center; cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.quick-feature-card:hover { box-shadow: 0 6px 24px rgba(99,102,241,0.14); transform: translateY(-3px); }
+.qf-icon {
+  width: 52px; height: 52px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 1.3rem; margin: 0 auto 12px;
+}
+.qf-title { font-size: 0.92rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.qf-desc { font-size: 0.78rem; color: var(--light); line-height: 1.4; }
+
+/* ─ Nearby grid override for single-column HD hospital list ─ */
+#hospitalsList.nearby-grid { grid-template-columns: 1fr; }
+
+/* Mobile tweaks */
+@media (max-width: 640px) {
+  .hd-doc-card { flex-wrap: wrap; }
+  .hd-doc-actions { flex-direction: row; min-width: 100%; width: 100%; }
+  .hd-doc-actions .btn-hd-view,
+  .hd-doc-actions .btn-hd-book { flex: 1; text-align: center; justify-content: center; }
+  .welcome-strip-inner { justify-content: center; text-align: center; }
+  .welcome-actions { justify-content: center; }
+  .dp-header { flex-direction: column; align-items: center; text-align: center; }
+  .quick-features-grid { grid-template-columns: repeat(2, 1fr); }
+  .dp-label { min-width: 80px; }
+}

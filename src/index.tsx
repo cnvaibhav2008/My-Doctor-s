@@ -17,6 +17,12 @@ app.use('/api/*', cors({
 }))
 
 // ─── UTILITY FUNCTIONS ───────────────────────────────────────────────────────
+function safeJson(val: any, fallback: any): any {
+  if (!val) return fallback
+  if (typeof val === 'object') return val
+  try { return JSON.parse(val) } catch { return fallback }
+}
+
 function generateId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 }
@@ -468,33 +474,47 @@ app.post('/api/auth/logout', async (c) => {
 // ─── DOCTOR ROUTES ────────────────────────────────────────────────────────────
 app.get('/api/doctors', async (c) => {
   try {
-    const { specialization, city, disease, search, limit = '20', offset = '0' } = c.req.query()
-    let query = 'SELECT * FROM doctors WHERE is_active = 1'
+    const { specialization, city, disease, search, hospital, limit = '50', offset = '0' } = c.req.query()
+    let query = `SELECT d.*, h.name as hospital_name_db, h.area as hospital_area, h.city as hospital_city
+      FROM doctors d
+      LEFT JOIN hospitals h ON d.hospital_id = h.id
+      WHERE d.is_active = 1`
     const params: any[] = []
 
-    if (specialization) { query += ' AND specialization = ?'; params.push(specialization) }
-    if (city) { query += ' AND (city LIKE ? OR state LIKE ?)'; params.push(`%${city}%`, `%${city}%`) }
+    if (specialization) { query += ' AND d.specialization LIKE ?'; params.push(`%${specialization}%`) }
+    if (city) { query += ' AND (h.city LIKE ? OR d.city LIKE ?)'; params.push(`%${city}%`, `%${city}%`) }
+    if (hospital) { query += ' AND (h.name LIKE ? OR d.hospital_name LIKE ?)'; params.push(`%${hospital}%`, `%${hospital}%`) }
     if (search) {
-      query += ' AND (name LIKE ? OR hospital_name LIKE ? OR specialization LIKE ?)'
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`)
+      query += ' AND (d.name LIKE ? OR d.hospital_name LIKE ? OR d.specialization LIKE ? OR h.name LIKE ?)'
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`)
     }
     if (disease) {
-      query += ' AND (diseases_treated LIKE ? OR specialization LIKE ?)'
+      query += ' AND (d.diseases_treated LIKE ? OR d.specialization LIKE ?)'
       params.push(`%${disease}%`, `%${disease}%`)
     }
 
-    query += ' ORDER BY rating DESC, total_ratings DESC'
+    query += ' ORDER BY d.is_verified DESC, d.rating DESC, d.total_ratings DESC'
     query += ` LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}`
 
     const { results } = await c.env.DB.prepare(query).bind(...params).all()
     const doctors = results.map((d: any) => ({
       ...d,
-      sub_specializations: JSON.parse(d.sub_specializations || '[]'),
-      available_days: JSON.parse(d.available_days || '[]'),
-      available_times: JSON.parse(d.available_times || '[]'),
-      languages: JSON.parse(d.languages || '[]'),
-      diseases_treated: JSON.parse(d.diseases_treated || '[]'),
-      user_id: undefined
+      // Use joined hospital name if available, fall back to stored hospital_name
+      hospital_name: d.hospital_name_db || d.hospital_name || 'Private Clinic',
+      city: d.hospital_city || d.city || '',
+      area: d.hospital_area || d.area || '',
+      sub_specializations: safeJson(d.sub_specializations, []),
+      available_days: safeJson(d.available_days, []),
+      available_times: safeJson(d.available_times, []),
+      languages: safeJson(d.languages, []),
+      diseases_treated: safeJson(d.diseases_treated, []),
+      opd_schedule: safeJson(d.opd_schedule, []),
+      awards: safeJson(d.awards, []),
+      publications: safeJson(d.publications, []),
+      user_id: undefined,
+      hospital_name_db: undefined,
+      hospital_area: undefined,
+      hospital_city: undefined
     }))
 
     return c.json({ success: true, doctors, total: doctors.length })
@@ -506,8 +526,24 @@ app.get('/api/doctors', async (c) => {
 app.get('/api/doctors/:id', async (c) => {
   try {
     const id = c.req.param('id')
-    const doctor = await c.env.DB.prepare('SELECT * FROM doctors WHERE id = ? AND is_active = 1').bind(id).first() as any
+    const doctor = await c.env.DB.prepare(`
+      SELECT d.*, h.name as hospital_name_db, h.area as hospital_area, h.city as hospital_city,
+             h.address as hospital_address, h.phone as hospital_phone, h.website as hospital_website,
+             h.google_maps_url as hospital_maps_url, h.emergency as hospital_emergency
+      FROM doctors d
+      LEFT JOIN hospitals h ON d.hospital_id = h.id
+      WHERE d.id = ? AND d.is_active = 1
+    `).bind(id).first() as any
     if (!doctor) return c.json({ success: false, error: 'Doctor not found' }, 404)
+
+    // Get all hospital links for this doctor
+    const links = await c.env.DB.prepare(`
+      SELECT dhl.*, h.name as h_name, h.area as h_area, h.city as h_city, h.address as h_address,
+             h.phone as h_phone, h.google_maps_url as h_maps_url
+      FROM doctor_hospital_links dhl
+      JOIN hospitals h ON dhl.hospital_id = h.id
+      WHERE dhl.doctor_id = ? AND dhl.is_active = 1
+    `).bind(id).all()
 
     const reviews = await c.env.DB.prepare(
       'SELECT r.*, p.name as patient_name FROM reviews r JOIN patients p ON r.patient_id = p.id WHERE r.doctor_id = ? ORDER BY r.created_at DESC LIMIT 10'
@@ -517,12 +553,25 @@ app.get('/api/doctors/:id', async (c) => {
       success: true,
       doctor: {
         ...doctor,
-        sub_specializations: JSON.parse(doctor.sub_specializations || '[]'),
-        available_days: JSON.parse(doctor.available_days || '[]'),
-        available_times: JSON.parse(doctor.available_times || '[]'),
-        languages: JSON.parse(doctor.languages || '[]'),
-        diseases_treated: JSON.parse(doctor.diseases_treated || '[]'),
-        user_id: undefined
+        hospital_name: doctor.hospital_name_db || doctor.hospital_name || 'Private Clinic',
+        city: doctor.hospital_city || doctor.city || '',
+        area: doctor.hospital_area || '',
+        sub_specializations: safeJson(doctor.sub_specializations, []),
+        available_days: safeJson(doctor.available_days, []),
+        available_times: safeJson(doctor.available_times, []),
+        languages: safeJson(doctor.languages, []),
+        diseases_treated: safeJson(doctor.diseases_treated, []),
+        opd_schedule: safeJson(doctor.opd_schedule, []),
+        awards: safeJson(doctor.awards, []),
+        publications: safeJson(doctor.publications, []),
+        hospital_links: (links.results || []).map((l: any) => ({
+          ...l,
+          opd_days: safeJson(l.opd_days, [])
+        })),
+        user_id: undefined,
+        hospital_name_db: undefined,
+        hospital_area: undefined,
+        hospital_city: undefined
       },
       reviews: reviews.results
     })
@@ -797,32 +846,109 @@ app.post('/api/reviews', async (c) => {
 })
 
 // ─── NEARBY SERVICES (using location) ─────────────────────────────────────────
+// ─── HOSPITALS API ────────────────────────────────────────────────────────────
+app.get('/api/hospitals', async (c) => {
+  try {
+    const { city, type, emergency, specialty, search, limit = '50', offset = '0' } = c.req.query()
+    let query = 'SELECT * FROM hospitals WHERE is_active = 1'
+    const params: any[] = []
+
+    if (city) { query += ' AND city LIKE ?'; params.push(`%${city}%`) }
+    if (type) { query += ' AND type = ?'; params.push(type) }
+    if (emergency === '1') { query += ' AND emergency = 1' }
+    if (specialty) { query += ' AND specialties LIKE ?'; params.push(`%${specialty}%`) }
+    if (search) {
+      query += ' AND (name LIKE ? OR area LIKE ? OR specialties LIKE ?)'
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`)
+    }
+
+    query += ' ORDER BY emergency DESC, rating DESC, name ASC'
+    query += ` LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}`
+
+    const { results } = await c.env.DB.prepare(query).bind(...params).all()
+    const hospitals = results.map((h: any) => ({
+      ...h,
+      specialties: safeJson(h.specialties, []),
+      departments: safeJson(h.departments, []),
+      facilities: safeJson(h.facilities, []),
+      opd_details: safeJson(h.opd_details, null),
+      emergency: !!h.emergency,
+      icu_available: !!h.icu_available,
+      blood_bank: !!h.blood_bank,
+      ambulance: !!h.ambulance
+    }))
+
+    return c.json({ success: true, hospitals, total: hospitals.length })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+app.get('/api/hospitals/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    // Support lookup by numeric id or hospital_id slug
+    const hospital = await c.env.DB.prepare(
+      'SELECT * FROM hospitals WHERE (id = ? OR hospital_id = ?) AND is_active = 1'
+    ).bind(id, id).first() as any
+    if (!hospital) return c.json({ success: false, error: 'Hospital not found' }, 404)
+
+    // Get connected doctors for this hospital
+    const doctorsQ = await c.env.DB.prepare(`
+      SELECT d.id, d.name, d.specialization, d.qualification, d.experience_years,
+             d.consultation_fee, d.is_verified, d.rating, d.total_ratings,
+             dhl.department, dhl.opd_days, dhl.opd_times, dhl.designation
+      FROM doctors d
+      JOIN doctor_hospital_links dhl ON dhl.doctor_id = d.id
+      WHERE dhl.hospital_id = ? AND d.is_active = 1 AND dhl.is_active = 1
+      ORDER BY d.specialization, d.name
+    `).bind(hospital.id).all()
+
+    return c.json({
+      success: true,
+      hospital: {
+        ...hospital,
+        specialties: safeJson(hospital.specialties, []),
+        departments: safeJson(hospital.departments, []),
+        facilities: safeJson(hospital.facilities, []),
+        opd_details: safeJson(hospital.opd_details, null),
+        emergency: !!hospital.emergency,
+        icu_available: !!hospital.icu_available,
+        blood_bank: !!hospital.blood_bank,
+        ambulance: !!hospital.ambulance
+      },
+      doctors: (doctorsQ.results || []).map((d: any) => ({
+        ...d,
+        opd_days: safeJson(d.opd_days, [])
+      }))
+    })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// Legacy nearby endpoint — now powered by real D1 hospitals table
 app.get('/api/nearby/hospitals', async (c) => {
-  const { lat, lng, city } = c.req.query()
+  try {
+    const { city } = c.req.query()
+    let query = 'SELECT * FROM hospitals WHERE is_active = 1'
+    const params: any[] = []
+    if (city) { query += ' AND city LIKE ?'; params.push(`%${city}%`) }
+    query += ' ORDER BY emergency DESC, rating DESC LIMIT 30'
 
-  const hospitals = [
-    { name: "AIIMS", type: "Government Hospital", distance: "2.3 km", rating: 4.5, phone: "011-26588500", emergency: true, specialties: ["All Departments"] },
-    { name: "Apollo Hospital", type: "Private Hospital", distance: "3.1 km", rating: 4.8, phone: "1860-500-1066", emergency: true, specialties: ["Cardiology","Oncology","Neurology"] },
-    { name: "Fortis Hospital", type: "Private Hospital", distance: "4.2 km", rating: 4.6, phone: "1800-111-5656", emergency: true, specialties: ["Orthopedics","Neurosciences"] },
-    { name: "Max Super Specialty", type: "Private Hospital", distance: "5.0 km", rating: 4.7, phone: "011-26515050", emergency: true, specialties: ["Oncology","Cardiology"] },
-    { name: "City Government Hospital", type: "Government Hospital", distance: "1.2 km", rating: 3.9, phone: "Local", emergency: true, specialties: ["General"] }
-  ]
+    const { results } = await c.env.DB.prepare(query).bind(...params).all()
+    const hospitals = results.map((h: any) => ({
+      ...h,
+      specialties: safeJson(h.specialties, []),
+      facilities: safeJson(h.facilities, []),
+      emergency: !!h.emergency
+    }))
 
-  const scanCentres = [
-    { name: "Dr. Lal PathLabs", type: "Diagnostic Centre", distance: "1.1 km", rating: 4.4, phone: "011-39885050", services: ["Blood Tests","Urine Tests","Pathology"] },
-    { name: "SRL Diagnostics", type: "Diagnostic Centre", distance: "2.0 km", rating: 4.3, phone: "1800-102-7774", services: ["CT Scan","MRI","X-Ray","Blood Tests"] },
-    { name: "Thyrocare", type: "Diagnostic Centre", distance: "2.5 km", rating: 4.5, phone: "9820900900", services: ["Blood Tests","Wellness Packages"] },
-    { name: "Metropolis Healthcare", type: "Diagnostic Centre", distance: "3.2 km", rating: 4.4, phone: "1800-200-3091", services: ["Pathology","Radiology","Molecular Diagnostics"] }
-  ]
-
-  const pharmacies = [
-    { name: "MedPlus Pharmacy", type: "Pharmacy", distance: "0.5 km", rating: 4.2, phone: "1800-103-0144", open24: true },
-    { name: "Apollo Pharmacy", type: "Pharmacy", distance: "0.8 km", rating: 4.5, phone: "1860-500-1066", open24: true },
-    { name: "Netmeds Store", type: "Pharmacy", distance: "1.5 km", rating: 4.1, phone: "044-71279999", open24: false },
-    { name: "Guardian Pharmacy", type: "Pharmacy", distance: "1.9 km", rating: 4.3, phone: "Local", open24: false }
-  ]
-
-  return c.json({ success: true, hospitals, scanCentres, pharmacies, location: { lat, lng, city } })
+    // Keep backward-compat shape: scanCentres and pharmacies remain empty for now
+    return c.json({ success: true, hospitals, scanCentres: [], pharmacies: [], total: hospitals.length })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
 })
 
 // ─── MEDICAL REPORTS ROUTES ──────────────────────────────────────────────────
@@ -1428,6 +1554,25 @@ app.get('*', (c) => {
 
 <!-- ═══════════════ HOME PAGE ═══════════════ -->
 <div id="page-home" class="page active">
+
+  <!-- WELCOME STRIP (shown when logged in) -->
+  <div id="welcomeStrip" style="display:none" class="welcome-strip">
+    <div class="container welcome-strip-inner">
+      <div class="welcome-left">
+        <div class="welcome-avatar" id="welcomeAvatar"><i class="fas fa-user-circle"></i></div>
+        <div>
+          <div class="welcome-greeting" id="welcomeGreeting">Welcome back!</div>
+          <div class="welcome-sub">Your health dashboard is ready</div>
+        </div>
+      </div>
+      <div class="welcome-actions">
+        <button class="btn-welcome-action" onclick="showPage('appointments')"><i class="fas fa-calendar-check"></i> My Appointments</button>
+        <button class="btn-welcome-action" onclick="showPage('aiChecker')"><i class="fas fa-robot"></i> AI Check</button>
+        <button class="btn-welcome-action secondary" onclick="showPage('dashboard')"><i class="fas fa-tachometer-alt"></i> Dashboard</button>
+      </div>
+    </div>
+  </div>
+
   <!-- HERO SECTION -->
   <section class="hero">
     <div class="hero-bg">
@@ -1519,54 +1664,96 @@ app.get('*', (c) => {
     </div>
   </section>
 
+  <!-- QUICK FEATURE CARDS — patient-friendly dashboard shortcuts -->
+  <section class="quick-features-section">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge"><i class="fas fa-th-large"></i> What Can I Do?</div>
+        <h2>Everything You Need, <span class="gradient-text">In One Place</span></h2>
+      </div>
+      <div class="quick-features-grid">
+        <div class="quick-feature-card" onclick="showPage('findDoctors')">
+          <div class="qf-icon" style="background:linear-gradient(135deg,#74b9ff,#0984e3)"><i class="fas fa-user-md"></i></div>
+          <div class="qf-title">Find a Doctor</div>
+          <div class="qf-desc">Search verified specialists in Hubballi–Dharwad</div>
+        </div>
+        <div class="quick-feature-card" onclick="showPage('aiChecker')">
+          <div class="qf-icon" style="background:linear-gradient(135deg,#a29bfe,#6c5ce7)"><i class="fas fa-robot"></i></div>
+          <div class="qf-title">AI Symptom Check</div>
+          <div class="qf-desc">Describe symptoms, get instant disease insights</div>
+        </div>
+        <div class="quick-feature-card" onclick="showPage('nearby')">
+          <div class="qf-icon" style="background:linear-gradient(135deg,#55efc4,#00b894)"><i class="fas fa-hospital-alt"></i></div>
+          <div class="qf-title">Nearby Hospitals</div>
+          <div class="qf-desc">Find hospitals with emergency, ICU &amp; specialists</div>
+        </div>
+        <div class="quick-feature-card" onclick="showPage('appointments')">
+          <div class="qf-icon" style="background:linear-gradient(135deg,#fdcb6e,#e17055)"><i class="fas fa-calendar-check"></i></div>
+          <div class="qf-title">My Appointments</div>
+          <div class="qf-desc">View, manage and track your bookings</div>
+        </div>
+        <div class="quick-feature-card" onclick="showPage('chat')">
+          <div class="qf-icon" style="background:linear-gradient(135deg,#fd79a8,#e84393)"><i class="fas fa-comment-medical"></i></div>
+          <div class="qf-title">MedBot Chat</div>
+          <div class="qf-desc">Ask any health question to our AI assistant</div>
+        </div>
+        <div class="quick-feature-card" onclick="showPage('reports')">
+          <div class="qf-icon" style="background:linear-gradient(135deg,#ff6b6b,#ee5a24)"><i class="fas fa-file-medical"></i></div>
+          <div class="qf-title">Health Records</div>
+          <div class="qf-desc">Store and access your medical reports safely</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- SPECIALIZATIONS -->
   <section class="specializations-section">
     <div class="container">
       <div class="section-header">
         <div class="section-badge">Our Specialties</div>
         <h2>Find Experts in <span class="gradient-text">Every Field</span></h2>
-        <p>Browse top medical specializations and find the best specialists</p>
+        <p>Tap a specialty to see verified doctors in Hubballi–Dharwad</p>
       </div>
       <div class="spec-grid">
-        <div class="spec-card" onclick="filterBySpec('Cardiologist')">
+        <div class="spec-card" onclick="filterBySpec('Cardiology')">
           <div class="spec-icon" style="background:linear-gradient(135deg,#ff6b6b,#ee5a24)"><i class="fas fa-heart"></i></div>
           <div class="spec-name">Cardiology</div>
-          <div class="spec-count">Heart & Vascular</div>
+          <div class="spec-count">Heart &amp; Vascular</div>
         </div>
-        <div class="spec-card" onclick="filterBySpec('Neurologist')">
-          <div class="spec-icon" style="background:linear-gradient(135deg,#a29bfe,#6c5ce7)"><i class="fas fa-brain"></i></div>
-          <div class="spec-name">Neurology</div>
-          <div class="spec-count">Brain & Nerves</div>
-        </div>
-        <div class="spec-card" onclick="filterBySpec('Orthopedic')">
+        <div class="spec-card" onclick="filterBySpec('Orthopaedics')">
           <div class="spec-icon" style="background:linear-gradient(135deg,#74b9ff,#0984e3)"><i class="fas fa-bone"></i></div>
-          <div class="spec-name">Orthopedics</div>
-          <div class="spec-count">Bones & Joints</div>
+          <div class="spec-name">Orthopaedics</div>
+          <div class="spec-count">Bones &amp; Joints</div>
         </div>
-        <div class="spec-card" onclick="filterBySpec('Dermatologist')">
-          <div class="spec-icon" style="background:linear-gradient(135deg,#fd79a8,#e84393)"><i class="fas fa-allergies"></i></div>
-          <div class="spec-name">Dermatology</div>
-          <div class="spec-count">Skin & Hair</div>
-        </div>
-        <div class="spec-card" onclick="filterBySpec('Gynecologist')">
-          <div class="spec-icon" style="background:linear-gradient(135deg,#fdcb6e,#e17055)"><i class="fas fa-female"></i></div>
-          <div class="spec-name">Gynecology</div>
+        <div class="spec-card" onclick="filterBySpec('Obstetrics')">
+          <div class="spec-icon" style="background:linear-gradient(135deg,#fdcb6e,#e17055)"><i class="fas fa-baby"></i></div>
+          <div class="spec-name">OBG</div>
           <div class="spec-count">Women's Health</div>
         </div>
-        <div class="spec-card" onclick="filterBySpec('Pulmonologist')">
-          <div class="spec-icon" style="background:linear-gradient(135deg,#55efc4,#00b894)"><i class="fas fa-lungs"></i></div>
-          <div class="spec-name">Pulmonology</div>
-          <div class="spec-count">Lungs & Breathing</div>
+        <div class="spec-card" onclick="filterBySpec('Paediatrics')">
+          <div class="spec-icon" style="background:linear-gradient(135deg,#55efc4,#00b894)"><i class="fas fa-child"></i></div>
+          <div class="spec-name">Paediatrics</div>
+          <div class="spec-count">Child Health</div>
         </div>
-        <div class="spec-card" onclick="filterBySpec('Endocrinologist')">
-          <div class="spec-icon" style="background:linear-gradient(135deg,#ffeaa7,#fdcb6e)"><i class="fas fa-vial"></i></div>
-          <div class="spec-name">Endocrinology</div>
-          <div class="spec-count">Hormones & Diabetes</div>
+        <div class="spec-card" onclick="filterBySpec('Neuro')">
+          <div class="spec-icon" style="background:linear-gradient(135deg,#a29bfe,#6c5ce7)"><i class="fas fa-brain"></i></div>
+          <div class="spec-name">Neuro Surgery</div>
+          <div class="spec-count">Brain &amp; Spine</div>
         </div>
-        <div class="spec-card" onclick="filterBySpec('Gastroenterologist')">
-          <div class="spec-icon" style="background:linear-gradient(135deg,#81ecec,#00cec9)"><i class="fas fa-stomach"></i></div>
-          <div class="spec-name">Gastroenterology</div>
-          <div class="spec-count">Digestive System</div>
+        <div class="spec-card" onclick="filterBySpec('Nephrology')">
+          <div class="spec-icon" style="background:linear-gradient(135deg,#81ecec,#00cec9)"><i class="fas fa-kidneys"></i></div>
+          <div class="spec-name">Nephrology</div>
+          <div class="spec-count">Kidney &amp; Transplant</div>
+        </div>
+        <div class="spec-card" onclick="filterBySpec('Urology')">
+          <div class="spec-icon" style="background:linear-gradient(135deg,#ffeaa7,#fdcb6e)"><i class="fas fa-procedures"></i></div>
+          <div class="spec-name">Urology</div>
+          <div class="spec-count">Urological Surgery</div>
+        </div>
+        <div class="spec-card" onclick="filterBySpec('Oncology')">
+          <div class="spec-icon" style="background:linear-gradient(135deg,#fd79a8,#e84393)"><i class="fas fa-ribbon"></i></div>
+          <div class="spec-name">Oncology</div>
+          <div class="spec-count">Cancer Care</div>
         </div>
       </div>
     </div>
@@ -1673,33 +1860,61 @@ app.get('*', (c) => {
   <div class="page-header-bg">
     <div class="container">
       <h1><i class="fas fa-user-md"></i> Find Doctors</h1>
-      <p>Search from thousands of verified specialists near you</p>
+      <p>Verified specialists in Hubballi–Dharwad — SDM, Vihaan, SeCURE &amp; more</p>
     </div>
   </div>
   <div class="container">
-    <div class="filter-bar">
+    <!-- Quick city tabs -->
+    <div class="city-tabs" id="doctorCityTabs" style="display:flex;gap:8px;margin:16px 0 0">
+      <button class="city-tab-btn active" onclick="setDoctorCity('')" id="dcAll">All Cities</button>
+      <button class="city-tab-btn" onclick="setDoctorCity('Hubballi')" id="dcHubballi">Hubballi</button>
+      <button class="city-tab-btn" onclick="setDoctorCity('Dharwad')" id="dcDharwad">Dharwad</button>
+    </div>
+    <!-- Filters -->
+    <div class="filter-bar" style="margin-top:10px">
       <div class="filter-search">
         <i class="fas fa-search"></i>
-        <input type="text" id="doctorSearch" placeholder="Search doctor, specialization or hospital..." oninput="searchDoctors()">
+        <input type="text" id="doctorSearch" placeholder="Search doctor name, specialty, hospital..." oninput="searchDoctors()">
       </div>
       <select class="filter-select" id="specFilter" onchange="searchDoctors()">
-        <option value="">All Specializations</option>
-        <option>Cardiologist</option><option>Neurologist</option><option>Orthopedic</option>
-        <option>Dermatologist</option><option>Gynecologist</option><option>Pulmonologist</option>
-        <option>Endocrinologist</option><option>Gastroenterologist</option><option>General Physician</option>
+        <option value="">All Specialties</option>
+        <option>Orthopaedics</option><option>Cardiology</option><option>Interventional Cardiology</option>
+        <option>Cardiovascular &amp; Thoracic Surgery</option><option>General Medicine</option>
+        <option>Obstetrics &amp; Gynaecology</option><option>Paediatrics</option>
+        <option>Paediatric Cardiology</option><option>Plastic Surgery</option>
+        <option>Paediatric Surgery</option><option>Interventional Radiology</option>
+        <option>Anaesthesiology</option><option>Sports Medicine</option>
+        <option>Surgical Gastroenterology</option><option>Neuro &amp; Spine Surgery</option>
+        <option>Nephrology</option><option>Urology</option><option>Surgical Oncology</option>
+        <option>Intensivist</option><option>General Surgery</option>
+        <option>Fetal Medicine</option><option>Dentistry</option>
       </select>
-      <input type="text" class="filter-select" id="cityFilter" placeholder="City..." oninput="searchDoctors()" style="min-width:120px">
-      <select class="filter-select" id="sortFilter" onchange="searchDoctors()">
-        <option value="rating">Sort by Rating</option>
+      <select class="filter-select" id="hospitalFilter" onchange="searchDoctors()">
+        <option value="">All Hospitals</option>
+        <option>SDM College of Medical Sciences</option>
+        <option>Vihaan Heart &amp; Super Speciality Hospital</option>
+        <option>SeCURE Hospital</option>
+        <option>KIMS</option><option>HCG Suchirayu</option><option>HCG NMR</option>
+      </select>
+      <select class="filter-select" id="sortFilter" onchange="loadDoctors()">
+        <option value="verified">Verified First</option>
         <option value="experience">By Experience</option>
         <option value="fee_low">Fee: Low to High</option>
         <option value="fee_high">Fee: High to Low</option>
       </select>
       <button class="btn-filter-clear" onclick="clearFilters()"><i class="fas fa-times"></i> Clear</button>
     </div>
-    <div class="results-info" id="resultsInfo"></div>
+    <div class="results-info" id="resultsInfo" style="margin:8px 0;font-size:0.85rem;color:var(--light)"></div>
     <div class="doctors-list" id="doctorsList">
       <div class="loading-state"><div class="spinner"></div><p>Finding doctors near you...</p></div>
+    </div>
+  </div>
+
+  <!-- Doctor Profile Modal -->
+  <div class="modal-overlay" id="doctorProfileModal" onclick="closeModalOnBg(event,'doctorProfileModal')" style="z-index:3000">
+    <div class="modal-box" style="max-width:600px;max-height:90vh;overflow-y:auto">
+      <button class="modal-close" onclick="closeModal('doctorProfileModal')" style="position:sticky;top:8px;float:right;z-index:1"><i class="fas fa-times"></i></button>
+      <div id="doctorProfileContent"></div>
     </div>
   </div>
 </div>
@@ -1868,32 +2083,43 @@ app.get('*', (c) => {
 <div id="page-nearby" class="page">
   <div class="page-header-bg nearby-header">
     <div class="container">
-      <h1><i class="fas fa-map-marker-alt"></i> Nearby Medical Services</h1>
-      <p>Find hospitals, diagnostic centres, and pharmacies near you</p>
+      <h1><i class="fas fa-hospital-alt"></i> Hospitals &amp; Medical Centres</h1>
+      <p>Verified hospitals in Hubballi–Dharwad — government, private &amp; specialty</p>
     </div>
   </div>
   <div class="container">
-    <div class="location-bar">
-      <div class="location-input-group">
-        <i class="fas fa-map-marker-alt"></i>
-        <input type="text" id="nearbyLocation" placeholder="Enter your city or enable location..." class="location-input">
+    <!-- City tabs -->
+    <div class="city-tabs" style="margin:16px 0 8px">
+      <button class="city-tab-btn active" onclick="loadNearbyServices('')" id="ncAll">All</button>
+      <button class="city-tab-btn" onclick="loadNearbyServices('Hubballi')" id="ncHubballi">Hubballi</button>
+      <button class="city-tab-btn" onclick="loadNearbyServices('Dharwad')" id="ncDharwad">Dharwad</button>
+    </div>
+    <!-- Filter bar -->
+    <div class="filter-bar" style="margin-bottom:12px">
+      <div class="filter-search">
+        <i class="fas fa-search"></i>
+        <input type="text" id="hospitalSearch" placeholder="Search hospital name or specialty..." oninput="searchHospitals()">
       </div>
-      <button class="btn-locate" onclick="detectLocation()"><i class="fas fa-crosshairs"></i> Use My Location</button>
-      <button class="btn-search-nearby" onclick="searchNearby()"><i class="fas fa-search"></i> Search</button>
+      <select class="filter-select" id="hospitalTypeFilter" onchange="searchHospitals()">
+        <option value="">All Types</option>
+        <option>Government</option><option>Private</option><option>Trust</option><option>Charitable</option>
+      </select>
+      <label class="filter-emergency-toggle" style="display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer">
+        <input type="checkbox" id="emergencyFilter" onchange="searchHospitals()" style="cursor:pointer">
+        <span>24/7 Emergency Only</span>
+      </label>
     </div>
-    <div class="nearby-tabs">
-      <button class="nearby-tab active" onclick="switchNearbyTab('hospitals', this)"><i class="fas fa-hospital"></i> Hospitals</button>
-      <button class="nearby-tab" onclick="switchNearbyTab('diagnostic', this)"><i class="fas fa-microscope"></i> Diagnostic Centres</button>
-      <button class="nearby-tab" onclick="switchNearbyTab('pharmacy', this)"><i class="fas fa-pills"></i> Pharmacies</button>
+    <div class="results-info" id="hospitalResultsInfo" style="font-size:0.85rem;color:var(--light);margin-bottom:10px"></div>
+    <div id="hospitalsList" class="nearby-grid">
+      <div class="loading-state"><div class="spinner"></div><p>Loading hospitals...</p></div>
     </div>
-    <div id="tab-hospitals" class="nearby-tab-content active">
-      <div id="hospitalsList" class="nearby-grid"><div class="loading-state"><div class="spinner"></div><p>Finding nearby hospitals...</p></div></div>
-    </div>
-    <div id="tab-diagnostic" class="nearby-tab-content">
-      <div id="diagnosticList" class="nearby-grid"></div>
-    </div>
-    <div id="tab-pharmacy" class="nearby-tab-content">
-      <div id="pharmacyList" class="nearby-grid"></div>
+  </div>
+
+  <!-- Hospital Profile Modal -->
+  <div class="modal-overlay" id="hospitalProfileModal" onclick="closeModalOnBg(event,'hospitalProfileModal')" style="z-index:3000">
+    <div class="modal-box" style="max-width:620px;max-height:90vh;overflow-y:auto">
+      <button class="modal-close" onclick="closeModal('hospitalProfileModal')" style="position:sticky;top:8px;float:right;z-index:1"><i class="fas fa-times"></i></button>
+      <div id="hospitalProfileContent"></div>
     </div>
   </div>
 </div>
