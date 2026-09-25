@@ -23,6 +23,134 @@ function safeJson(val: any, fallback: any): any {
   try { return JSON.parse(val) } catch { return fallback }
 }
 
+// ─── SYMPTOM / DISEASE → SPECIALIZATION MAP ──────────────────────────────────
+// Maps common layperson search terms to doctor specializations stored in the DB.
+// Used by /api/doctors to expand a search term into relevant specializations.
+// Keys use DB-exact specialization strings so LIKE '%value%' matches correctly.
+const SYMPTOM_SPEC_MAP: Record<string, string[]> = {
+  // ── Cardiac ─────────────────────────────────────────────────────────
+  'heart':         ['Cardiologist','Cardiovascular','Cardiac'],
+  'cardiac':       ['Cardiologist','Cardiovascular','Cardiac'],
+  'chest pain':    ['Cardiologist','Cardiovascular','General Medicine'],
+  'chest':         ['Cardiologist','Cardiovascular','General Medicine'],
+  'palpitation':   ['Cardiologist'],
+  'blood pressure':['Cardiologist','General Medicine','Nephrologist'],
+  'hypertension':  ['Cardiologist','General Medicine','Nephrologist'],
+  'cholesterol':   ['Cardiologist','General Medicine'],
+  // ── Orthopaedic ─────────────────────────────────────────────────────
+  'bone':          ['Orthopaedic','Orthopedic'],
+  'joint':         ['Orthopaedic','Orthopedic','General Medicine'],
+  'knee':          ['Orthopaedic','Orthopedic'],
+  'back pain':     ['Orthopaedic','Orthopedic','Neurosurgeon'],
+  'spine':         ['Orthopaedic','Orthopedic','Neurosurgeon'],
+  'fracture':      ['Orthopaedic','Orthopedic'],
+  'shoulder':      ['Orthopaedic','Orthopedic'],
+  'hip':           ['Orthopaedic','Orthopedic'],
+  'sports':        ['Orthopaedic','Orthopedic'],
+  'arthritis':     ['Orthopaedic','Orthopedic','General Medicine'],
+  'ligament':      ['Orthopaedic','Orthopedic'],
+  // ── OBG / Women ─────────────────────────────────────────────────────
+  'pregnancy':     ['Gynecologist'],
+  'gynecolog':     ['Gynecologist'],
+  'obstetrics':    ['Gynecologist'],
+  'women':         ['Gynecologist'],
+  'menstrual':     ['Gynecologist'],
+  'uterus':        ['Gynecologist'],
+  'fetal':         ['Gynecologist'],
+  'delivery':      ['Gynecologist'],
+  // ── Paediatrics ─────────────────────────────────────────────────────
+  'child':         ['Pediatrician','Pediatric','Paediatrician'],
+  'baby':          ['Pediatrician','Pediatric','Paediatrician'],
+  'infant':        ['Pediatrician','Pediatric','Paediatrician'],
+  'kids':          ['Pediatrician','Pediatric','Paediatrician'],
+  'newborn':       ['Pediatrician','Pediatric','Paediatrician'],
+  // ── Neuro ────────────────────────────────────────────────────────────
+  'brain':         ['Neurosurgeon'],
+  'headache':      ['Neurosurgeon','General Medicine'],
+  'stroke':        ['Neurosurgeon'],
+  'seizure':       ['Neurosurgeon'],
+  'epilepsy':      ['Neurosurgeon'],
+  'nerve':         ['Neurosurgeon'],
+  'paralysis':     ['Neurosurgeon'],
+  // ── Kidney / Nephrology ──────────────────────────────────────────────
+  'kidney':        ['Nephrologist','Urologist'],
+  'renal':         ['Nephrologist'],
+  'dialysis':      ['Nephrologist'],
+  // ── Urology ──────────────────────────────────────────────────────────
+  'urine':         ['Urologist','Nephrologist'],
+  'prostate':      ['Urologist'],
+  'bladder':       ['Urologist'],
+  'urolog':        ['Urologist','Nephrologist'],
+  'kidney stone':  ['Urologist','Nephrologist'],
+  // ── Gastroenterology ─────────────────────────────────────────────────
+  'stomach':       ['Gastroenterologist','General Medicine'],
+  'liver':         ['Gastroenterologist','General Medicine'],
+  'digestion':     ['Gastroenterologist','General Medicine'],
+  'gastro':        ['Gastroenterologist'],
+  'abdom':         ['Gastroenterologist','General Surgeon'],
+  'gut':           ['Gastroenterologist'],
+  'acidity':       ['Gastroenterologist','General Medicine'],
+  // ── Cancer / Oncology ────────────────────────────────────────────────
+  'cancer':        ['Oncologist'],
+  'tumor':         ['Oncologist'],
+  'oncolog':       ['Oncologist'],
+  // ── General / Fever ──────────────────────────────────────────────────
+  'fever':         ['General Medicine'],
+  'cold':          ['General Medicine'],
+  'flu':           ['General Medicine'],
+  'fatigue':       ['General Medicine'],
+  'diabetes':      ['General Medicine'],
+  'thyroid':       ['General Medicine'],
+  'hormone':       ['General Medicine'],
+  // ── Skin / Dermatology ───────────────────────────────────────────────
+  'skin':          ['Dermatologist','Dermatology'],
+  'rash':          ['Dermatologist','Dermatology','General Medicine'],
+  'acne':          ['Dermatologist','Dermatology'],
+  'eczema':        ['Dermatologist','Dermatology'],
+  'psoriasis':     ['Dermatologist','Dermatology'],
+  // ── Eye / Ophthalmology ──────────────────────────────────────────────
+  'eye':           ['Ophthalmologist','Ophthalmology'],
+  'vision':        ['Ophthalmologist','Ophthalmology'],
+  'cataract':      ['Ophthalmologist','Ophthalmology'],
+  'glaucoma':      ['Ophthalmologist','Ophthalmology'],
+  // ── ENT ──────────────────────────────────────────────────────────────
+  'ear':           ['ENT'],
+  'nose':          ['ENT'],
+  'throat':        ['ENT','General Medicine'],
+  'hearing':       ['ENT'],
+  'tonsil':        ['ENT'],
+  // ── Surgery ──────────────────────────────────────────────────────────
+  'surgery':       ['General Surgeon','Plastic Surgeon','Neurosurgeon'],
+  'hernia':        ['General Surgeon'],
+  'appendix':      ['General Surgeon'],
+  'gallstone':     ['General Surgeon'],
+  'plastic':       ['Plastic Surgeon'],
+  // ── Dental ───────────────────────────────────────────────────────────
+  'dental':        ['Dentist'],
+  'tooth':         ['Dentist'],
+  'teeth':         ['Dentist'],
+  'gum':           ['Dentist'],
+  // ── Radiology ────────────────────────────────────────────────────────
+  'radiology':     ['Interventional Radiologist'],
+  'scan':          ['Interventional Radiologist'],
+  'mri':           ['Interventional Radiologist'],
+  // ── Anaesthesia ──────────────────────────────────────────────────────
+  'anaesthesia':   ['Anaesthesiologist'],
+}
+
+// Returns an array of specialization substrings that match the search term
+function resolveSpecializations(term: string): string[] {
+  const lower = term.toLowerCase().trim()
+  if (!lower) return []
+  const specs = new Set<string>()
+  for (const [key, vals] of Object.entries(SYMPTOM_SPEC_MAP)) {
+    if (lower.includes(key) || key.includes(lower)) {
+      vals.forEach(v => specs.add(v))
+    }
+  }
+  return Array.from(specs)
+}
+
 function generateId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 }
@@ -475,26 +603,68 @@ app.post('/api/auth/logout', async (c) => {
 app.get('/api/doctors', async (c) => {
   try {
     const { specialization, city, disease, search, hospital, limit = '50', offset = '0' } = c.req.query()
-    let query = `SELECT d.*, h.name as hospital_name_db, h.area as hospital_area, h.city as hospital_city
+
+    // Build base query with hospital join
+    const baseSelect = `SELECT d.*, h.name as hospital_name_db, h.area as hospital_area, h.city as hospital_city
       FROM doctors d
       LEFT JOIN hospitals h ON d.hospital_id = h.id
       WHERE d.is_active = 1`
+
+    let conditions = ''
     const params: any[] = []
 
-    if (specialization) { query += ' AND d.specialization LIKE ?'; params.push(`%${specialization}%`) }
-    if (city) { query += ' AND (h.city LIKE ? OR d.city LIKE ?)'; params.push(`%${city}%`, `%${city}%`) }
-    if (hospital) { query += ' AND (h.name LIKE ? OR d.hospital_name LIKE ?)'; params.push(`%${hospital}%`, `%${hospital}%`) }
-    if (search) {
-      query += ' AND (d.name LIKE ? OR d.hospital_name LIKE ? OR d.specialization LIKE ? OR h.name LIKE ?)'
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`)
-    }
-    if (disease) {
-      query += ' AND (d.diseases_treated LIKE ? OR d.specialization LIKE ?)'
-      params.push(`%${disease}%`, `%${disease}%`)
+    // Explicit specialization filter (from dropdown)
+    if (specialization) {
+      conditions += ' AND d.specialization LIKE ?'
+      params.push(`%${specialization}%`)
     }
 
-    query += ' ORDER BY d.is_verified DESC, d.rating DESC, d.total_ratings DESC'
-    query += ` LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}`
+    // City filter
+    if (city) {
+      conditions += ' AND (h.city LIKE ? OR d.city LIKE ?)'
+      params.push(`%${city}%`, `%${city}%`)
+    }
+
+    // Hospital name filter
+    if (hospital) {
+      conditions += ' AND (h.name LIKE ? OR d.hospital_name LIKE ?)'
+      params.push(`%${hospital}%`, `%${hospital}%`)
+    }
+
+    // Smart search: resolves symptoms/diseases to specializations
+    if (search) {
+      const resolvedSpecs = resolveSpecializations(search)
+      if (resolvedSpecs.length > 0) {
+        // When symptom/disease resolved → match name OR resolved specializations only
+        // Do NOT match h.name here — would pull unrelated doctors from "Heart Hospital"
+        const specConditions = resolvedSpecs.map(() => 'd.specialization LIKE ?').join(' OR ')
+        conditions += ` AND (d.name LIKE ? OR ${specConditions})`
+        params.push(`%${search}%`)
+        resolvedSpecs.forEach(s => params.push(`%${s}%`))
+      } else {
+        // Fallback: text search on name, hospital, specialization, diseases_treated
+        conditions += ' AND (d.name LIKE ? OR d.hospital_name LIKE ? OR d.specialization LIKE ? OR d.diseases_treated LIKE ? OR h.name LIKE ?)'
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`)
+      }
+    }
+
+    // Disease filter (from legacy disease param)
+    if (disease) {
+      const resolvedSpecs = resolveSpecializations(disease)
+      if (resolvedSpecs.length > 0) {
+        const specConditions = resolvedSpecs.map(() => 'd.specialization LIKE ?').join(' OR ')
+        conditions += ` AND (d.diseases_treated LIKE ? OR ${specConditions})`
+        params.push(`%${disease}%`)
+        resolvedSpecs.forEach(s => params.push(`%${s}%`))
+      } else {
+        conditions += ' AND (d.diseases_treated LIKE ? OR d.specialization LIKE ?)'
+        params.push(`%${disease}%`, `%${disease}%`)
+      }
+    }
+
+    const query = baseSelect + conditions +
+      ' ORDER BY d.is_verified DESC, d.rating DESC, d.total_ratings DESC' +
+      ` LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}`
 
     const { results } = await c.env.DB.prepare(query).bind(...params).all()
     const doctors = results.map((d: any) => ({
@@ -1545,9 +1715,6 @@ app.get('*', (c) => {
       <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Switch Dark/Light Mode" aria-label="Toggle dark mode">
         <i class="fas fa-moon" id="themeIcon"></i>
       </button>
-      <button class="hamburger" id="hamburger" onclick="toggleMenu()">
-        <span></span><span></span><span></span>
-      </button>
     </div>
   </div>
 </nav>
@@ -1668,40 +1835,78 @@ app.get('*', (c) => {
   <section class="quick-features-section">
     <div class="container">
       <div class="section-header">
-        <div class="section-badge"><i class="fas fa-th-large"></i> What Can I Do?</div>
+        <div class="section-badge"><i class="fas fa-th-large"></i> Your Health Hub</div>
         <h2>Everything You Need, <span class="gradient-text">In One Place</span></h2>
+        <p>All your healthcare tools — doctors, hospitals, AI, and records — right here.</p>
       </div>
-      <div class="quick-features-grid">
-        <div class="quick-feature-card" onclick="showPage('findDoctors')">
-          <div class="qf-icon" style="background:linear-gradient(135deg,#74b9ff,#0984e3)"><i class="fas fa-user-md"></i></div>
-          <div class="qf-title">Find a Doctor</div>
-          <div class="qf-desc">Search verified specialists in Hubballi–Dharwad</div>
+      <div class="qf-grid">
+
+        <div class="qf-card" onclick="showPage('findDoctors')">
+          <div class="qf-card-icon" style="background:linear-gradient(135deg,#0066FF,#4D8FFF)">
+            <i class="fas fa-user-md"></i>
+          </div>
+          <div class="qf-card-body">
+            <div class="qf-card-title">Find a Doctor</div>
+            <div class="qf-card-desc">Search verified specialists in Hubballi–Dharwad by name, specialty, or symptom</div>
+          </div>
+          <div class="qf-card-arrow"><i class="fas fa-arrow-right"></i></div>
         </div>
-        <div class="quick-feature-card" onclick="showPage('aiChecker')">
-          <div class="qf-icon" style="background:linear-gradient(135deg,#a29bfe,#6c5ce7)"><i class="fas fa-robot"></i></div>
-          <div class="qf-title">AI Symptom Check</div>
-          <div class="qf-desc">Describe symptoms, get instant disease insights</div>
+
+        <div class="qf-card" onclick="showPage('nearby')">
+          <div class="qf-card-icon" style="background:linear-gradient(135deg,#00C9A7,#00D4B0)">
+            <i class="fas fa-hospital-alt"></i>
+          </div>
+          <div class="qf-card-body">
+            <div class="qf-card-title">Nearby Hospitals</div>
+            <div class="qf-card-desc">Discover hospitals with emergency care, ICU, and specialist departments near you</div>
+          </div>
+          <div class="qf-card-arrow"><i class="fas fa-arrow-right"></i></div>
         </div>
-        <div class="quick-feature-card" onclick="showPage('nearby')">
-          <div class="qf-icon" style="background:linear-gradient(135deg,#55efc4,#00b894)"><i class="fas fa-hospital-alt"></i></div>
-          <div class="qf-title">Nearby Hospitals</div>
-          <div class="qf-desc">Find hospitals with emergency, ICU &amp; specialists</div>
+
+        <div class="qf-card" onclick="showPage('aiChecker')">
+          <div class="qf-card-icon" style="background:linear-gradient(135deg,#7C3AED,#A855F7)">
+            <i class="fas fa-robot"></i>
+          </div>
+          <div class="qf-card-body">
+            <div class="qf-card-title">AI Symptom Check</div>
+            <div class="qf-card-desc">Describe your symptoms and get instant AI-powered medical insights and guidance</div>
+          </div>
+          <div class="qf-card-arrow"><i class="fas fa-arrow-right"></i></div>
         </div>
-        <div class="quick-feature-card" onclick="showPage('appointments')">
-          <div class="qf-icon" style="background:linear-gradient(135deg,#fdcb6e,#e17055)"><i class="fas fa-calendar-check"></i></div>
-          <div class="qf-title">My Appointments</div>
-          <div class="qf-desc">View, manage and track your bookings</div>
+
+        <div class="qf-card" onclick="showPage('chat')">
+          <div class="qf-card-icon" style="background:linear-gradient(135deg,#FF6B6B,#FF9500)">
+            <i class="fas fa-comment-medical"></i>
+          </div>
+          <div class="qf-card-body">
+            <div class="qf-card-title">MedBot Chat</div>
+            <div class="qf-card-desc">Ask any health, medicine, or wellness question to our intelligent AI assistant</div>
+          </div>
+          <div class="qf-card-arrow"><i class="fas fa-arrow-right"></i></div>
         </div>
-        <div class="quick-feature-card" onclick="showPage('chat')">
-          <div class="qf-icon" style="background:linear-gradient(135deg,#fd79a8,#e84393)"><i class="fas fa-comment-medical"></i></div>
-          <div class="qf-title">MedBot Chat</div>
-          <div class="qf-desc">Ask any health question to our AI assistant</div>
+
+        <div class="qf-card" onclick="showPage('appointments')">
+          <div class="qf-card-icon" style="background:linear-gradient(135deg,#F59E0B,#EF4444)">
+            <i class="fas fa-calendar-check"></i>
+          </div>
+          <div class="qf-card-body">
+            <div class="qf-card-title">My Appointments</div>
+            <div class="qf-card-desc">Book, view and manage your upcoming doctor appointments in one place</div>
+          </div>
+          <div class="qf-card-arrow"><i class="fas fa-arrow-right"></i></div>
         </div>
-        <div class="quick-feature-card" onclick="showPage('reports')">
-          <div class="qf-icon" style="background:linear-gradient(135deg,#ff6b6b,#ee5a24)"><i class="fas fa-file-medical"></i></div>
-          <div class="qf-title">Health Records</div>
-          <div class="qf-desc">Store and access your medical reports safely</div>
+
+        <div class="qf-card" onclick="showPage('reports')">
+          <div class="qf-card-icon" style="background:linear-gradient(135deg,#059669,#10B981)">
+            <i class="fas fa-file-medical-alt"></i>
+          </div>
+          <div class="qf-card-body">
+            <div class="qf-card-title">Health Records</div>
+            <div class="qf-card-desc">Securely store, access and share your prescriptions, lab reports and medical history</div>
+          </div>
+          <div class="qf-card-arrow"><i class="fas fa-arrow-right"></i></div>
         </div>
+
       </div>
     </div>
   </section>

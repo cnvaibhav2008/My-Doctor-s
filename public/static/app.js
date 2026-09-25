@@ -993,33 +993,48 @@ function searchHospitals() {
 }
 
 function renderHospitalCard(h) {
-  const specs = (h.specialties || []).slice(0, 4).map(s => `<span class="nearby-service-tag">${s}</span>`).join('');
-  const emergBadge = h.emergency ? `<span class="badge-emergency">🚨 24/7 Emergency</span>` : '';
-  const typeIcon = h.type === 'Government' ? 'fa-landmark' : h.type === 'Trust' ? 'fa-hands-helping' : 'fa-hospital';
+  const specs = (h.specialties || []).slice(0, 5).map(s => `<span class="hosp-spec-tag">${s}</span>`).join('');
+  const specsBlock = specs ? `<div class="hosp-spec-row">${specs}</div>` : '';
+  const typeIcon = h.type === 'Government' ? 'fa-landmark' : h.type === 'Trust' ? 'fa-hands-helping' : 'fa-hospital-alt';
   const areaText = h.area ? `, ${h.area}` : '';
-  const ratingHtml = h.rating ? `<div class="nearby-rating-row" style="margin-top:6px">${generateStars(h.rating)}<span style="font-size:0.82rem;color:var(--light);margin-left:4px">${h.rating}</span></div>` : '';
-  const phoneHtml = h.phone ? `<a href="tel:${h.phone}" class="btn-call"><i class="fas fa-phone"></i> Call</a>` : '';
-  const mapsHtml = h.google_maps_url ? `<a href="${h.google_maps_url}" target="_blank" class="btn-directions"><i class="fas fa-directions"></i> Directions</a>` : `<button class="btn-directions" onclick="openDirections('${h.name}')"><i class="fas fa-directions"></i> Directions</button>`;
+  const emergBadge = h.emergency
+    ? `<span class="hosp-emerg-badge"><i class="fas fa-ambulance"></i> 24/7 Emergency</span>`
+    : '';
+  const bedsBadge = h.bed_count
+    ? `<span class="hosp-meta-chip"><i class="fas fa-bed"></i> ${h.bed_count} Beds</span>`
+    : '';
+  const icuBadge = h.icu_available
+    ? `<span class="hosp-meta-chip"><i class="fas fa-procedures"></i> ICU</span>`
+    : '';
+  const accBadge = h.accreditation
+    ? `<span class="hosp-meta-chip"><i class="fas fa-certificate"></i> ${h.accreditation}</span>`
+    : '';
+  const metaRow = (emergBadge || bedsBadge || icuBadge || accBadge)
+    ? `<div class="hosp-meta-row">${emergBadge}${bedsBadge}${icuBadge}${accBadge}</div>` : '';
+
+  const phoneHtml = h.phone
+    ? `<a href="tel:${h.phone}" class="hosp-btn hosp-btn-call"><i class="fas fa-phone"></i> ${h.phone}</a>`
+    : '';
+  const mapsHtml = h.google_maps_url
+    ? `<a href="${h.google_maps_url}" target="_blank" class="hosp-btn hosp-btn-dir"><i class="fas fa-directions"></i> Directions</a>`
+    : `<button class="hosp-btn hosp-btn-dir" onclick="openDirections('${h.name.replace(/'/g,"\\'")}')"><i class="fas fa-directions"></i> Directions</button>`;
 
   return `
   <div class="hd-hospital-card">
     <div class="hd-hospital-top">
-      <div class="hd-hospital-icon-wrap">
-        <div class="nearby-icon hospital"><i class="fas ${typeIcon}"></i></div>
-        ${emergBadge}
-      </div>
+      <div class="hd-hosp-avatar"><i class="fas ${typeIcon}"></i></div>
       <div class="hd-hospital-header-info">
         <div class="hd-hospital-name">${h.name}</div>
-        <div class="hd-hospital-type"><i class="fas fa-tag"></i> ${h.type} · ${h.category || 'Hospital'}</div>
+        <div class="hd-hospital-type">${h.type}${h.category && h.category !== h.type ? ' · ' + h.category : ''}</div>
         <div class="hd-hospital-loc"><i class="fas fa-map-marker-alt"></i> ${h.city}${areaText}</div>
       </div>
     </div>
-    ${ratingHtml}
-    <div class="nearby-services-tags" style="margin:8px 0">${specs}</div>
+    ${metaRow}
+    ${specsBlock}
     <div class="hd-hospital-actions">
+      <button class="hosp-btn hosp-btn-view" onclick="showHospitalProfile(${h.id})"><i class="fas fa-info-circle"></i> View Details</button>
+      <button class="hosp-btn hosp-btn-docs" onclick="showPage('findDoctors');setDoctorCity('${h.city}')"><i class="fas fa-user-md"></i> Find Doctors</button>
       ${phoneHtml}
-      <button class="btn-hd-view" onclick="showHospitalProfile(${h.id})"><i class="fas fa-info-circle"></i> View Hospital</button>
-      <button class="btn-hd-book" onclick="showPage('findDoctors');setDoctorCity('${h.city}')"><i class="fas fa-user-md"></i> Find Doctors</button>
       ${mapsHtml}
     </div>
   </div>`;
@@ -1039,8 +1054,18 @@ async function showHospitalProfile(hospitalId) {
   const h = res.data.hospital;
   const doctors = res.data.doctors || [];
 
-  const specs = (h.specialties || []).map(s => `<span class="nearby-service-tag">${s}</span>`).join('');
-  const facilities = (h.facilities || []).map(f => `<span class="dc-meta-pill"><i class="fas fa-check"></i> ${f}</span>`).join('');
+  const specs = (h.specialties || []).map(s => `<span class="hosp-spec-tag">${s}</span>`).join('');
+  const facilities = (h.facilities || []).map(f => `<span class="hosp-meta-chip"><i class="fas fa-check-circle" style="color:var(--secondary)"></i> ${f}</span>`).join('');
+
+  // Badges row
+  const badges = [
+    h.emergency ? `<span class="hosp-emerg-badge"><i class="fas fa-ambulance"></i> 24/7 Emergency</span>` : '',
+    h.bed_count ? `<span class="hosp-meta-chip"><i class="fas fa-bed"></i> ${h.bed_count} Beds</span>` : '',
+    h.icu_available ? `<span class="hosp-meta-chip"><i class="fas fa-procedures"></i> ICU</span>` : '',
+    h.blood_bank ? `<span class="hosp-meta-chip"><i class="fas fa-tint"></i> Blood Bank</span>` : '',
+    h.ambulance ? `<span class="hosp-meta-chip"><i class="fas fa-ambulance"></i> Ambulance</span>` : '',
+    h.accreditation ? `<span class="hosp-meta-chip"><i class="fas fa-certificate"></i> ${h.accreditation}</span>` : '',
+  ].filter(Boolean).join('');
 
   const doctorsHtml = doctors.length ? `
     <div class="dp-section">
@@ -1050,46 +1075,58 @@ async function showHospitalProfile(hospitalId) {
           <div class="hp-doc-row" onclick="closeModal('hospitalProfileModal');showDoctorProfile(${d.id})">
             <div class="hp-doc-avatar">${d.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase()}</div>
             <div>
-              <div class="hp-doc-name">${d.name} ${d.is_verified ? '<i class="fas fa-check-circle" style="color:var(--primary);font-size:0.75rem"></i>' : ''}</div>
-              <div class="hp-doc-spec" style="font-size:0.82rem;color:var(--light)">${d.specialization}${d.opd_days && d.opd_days.length ? ' · OPD: ' + d.opd_days.join(',') : ''}</div>
+              <div class="hp-doc-name">${d.name}${d.is_verified ? ' <i class="fas fa-check-circle" style="color:var(--primary);font-size:0.75rem"></i>' : ''}</div>
+              <div style="font-size:0.8rem;color:var(--text-muted)">${d.specialization}${d.opd_days && d.opd_days.length ? ' · OPD: ' + d.opd_days.join(', ') : ''}</div>
             </div>
+            <i class="fas fa-chevron-right" style="margin-left:auto;color:var(--text-muted);font-size:0.75rem"></i>
           </div>`).join('')}
       </div>
     </div>` : '';
 
-  const phoneHtml = h.phone ? `<a href="tel:${h.phone}" class="btn-call"><i class="fas fa-phone"></i> ${h.phone}</a>` : '';
-  const websiteHtml = h.website ? `<a href="${h.website}" target="_blank" class="btn-directions" style="text-decoration:none"><i class="fas fa-globe"></i> Website</a>` : '';
-  const mapsHtml = h.google_maps_url ? `<a href="${h.google_maps_url}" target="_blank" class="btn-directions"><i class="fas fa-directions"></i> Directions</a>` : `<button class="btn-directions" onclick="openDirections('${h.name}')"><i class="fas fa-directions"></i> Get Directions</button>`;
+  const phoneHtml = h.phone ? `<a href="tel:${h.phone}" class="hosp-btn hosp-btn-call"><i class="fas fa-phone"></i> ${h.phone}</a>` : '';
+  const websiteHtml = h.website ? `<a href="${h.website}" target="_blank" class="hosp-btn hosp-btn-dir" style="text-decoration:none"><i class="fas fa-globe"></i> Website</a>` : '';
+  const mapsHtml = h.google_maps_url
+    ? `<a href="${h.google_maps_url}" target="_blank" class="hosp-btn hosp-btn-dir"><i class="fas fa-directions"></i> Directions</a>`
+    : `<button class="hosp-btn hosp-btn-dir" onclick="openDirections('${(h.name||'').replace(/'/g,"\\'")}')"><i class="fas fa-directions"></i> Get Directions</button>`;
 
   content.innerHTML = `
     <div class="hospital-profile-inner">
       <div class="hp-header">
         <div class="hp-header-icon"><i class="fas fa-hospital-alt"></i></div>
-        <div>
-          <h2>${h.name}${h.short_name ? ` <small>(${h.short_name})</small>` : ''}</h2>
-          <div class="hp-type-city">${h.type} · ${h.category || ''} · <i class="fas fa-map-marker-alt"></i> ${h.city}${h.area ? ', ' + h.area : ''}</div>
-          ${h.emergency ? '<span class="badge-emergency" style="margin-top:6px;display:inline-block">🚨 24/7 Emergency</span>' : ''}
-          ${h.accreditation ? `<span class="dc-meta-pill" style="margin-left:6px"><i class="fas fa-certificate"></i> ${h.accreditation}</span>` : ''}
+        <div style="flex:1;min-width:0">
+          <h2 style="margin:0 0 3px;font-size:1.15rem;line-height:1.3">${h.name}${h.short_name ? ` <small style="font-weight:500;color:var(--text-muted)">(${h.short_name})</small>` : ''}</h2>
+          <div class="hp-type-city">${h.type}${h.category && h.category !== h.type ? ' · ' + h.category : ''} <span style="margin:0 4px">·</span> <i class="fas fa-map-marker-alt"></i> ${h.city}${h.area ? ', ' + h.area : ''}</div>
         </div>
       </div>
+      ${badges ? `<div class="hosp-meta-row" style="margin-bottom:12px">${badges}</div>` : ''}
       ${h.rating ? `<div class="hp-rating-row">${generateStars(h.rating)} <span>${h.rating} rating</span></div>` : ''}
       ${h.description ? `<p class="hp-desc">${h.description}</p>` : ''}
+
       <div class="dp-section">
         <h4><i class="fas fa-info-circle"></i> Details</h4>
-        ${h.address ? `<div class="dp-row"><i class="fas fa-map-marker-alt"></i> ${h.address}${h.pincode ? ' – ' + h.pincode : ''}</div>` : ''}
-        ${h.opd_timings ? `<div class="dp-row"><i class="fas fa-clock"></i> OPD: ${h.opd_timings}</div>` : ''}
-        ${h.bed_count ? `<div class="dp-row"><i class="fas fa-bed"></i> ${h.bed_count} beds</div>` : ''}
-        ${h.established_year ? `<div class="dp-row"><i class="fas fa-calendar-alt"></i> Est. ${h.established_year}</div>` : ''}
-        ${h.icu_available ? `<div class="dp-row"><i class="fas fa-procedures"></i> ICU Available</div>` : ''}
-        ${h.blood_bank ? `<div class="dp-row"><i class="fas fa-tint"></i> Blood Bank</div>` : ''}
-        ${h.ambulance ? `<div class="dp-row"><i class="fas fa-ambulance"></i> Ambulance</div>` : ''}
+        ${h.address ? `<div class="dp-row"><i class="fas fa-map-marker-alt"></i><span>${h.address}${h.pincode ? ' – ' + h.pincode : ''}</span></div>` : ''}
+        ${h.opd_timings ? `<div class="dp-row"><i class="fas fa-clock"></i><span><strong>OPD:</strong> ${h.opd_timings}</span></div>` : ''}
+        ${h.established_year ? `<div class="dp-row"><i class="fas fa-calendar-alt"></i><span>Established ${h.established_year}</span></div>` : ''}
       </div>
-      ${h.specialties && h.specialties.length ? `<div class="dp-section"><h4><i class="fas fa-stethoscope"></i> Specialties</h4><div class="nearby-services-tags">${specs}</div></div>` : ''}
-      ${h.facilities && h.facilities.length ? `<div class="dp-section"><h4><i class="fas fa-tools"></i> Facilities</h4><div class="hd-facilities-wrap">${facilities}</div></div>` : ''}
+
+      ${h.specialties && h.specialties.length ? `
+      <div class="dp-section">
+        <h4><i class="fas fa-stethoscope"></i> Specialties & Departments</h4>
+        <div class="hosp-spec-row">${specs}</div>
+      </div>` : ''}
+
+      ${h.facilities && h.facilities.length ? `
+      <div class="dp-section">
+        <h4><i class="fas fa-tools"></i> Facilities</h4>
+        <div class="hd-facilities-wrap">${facilities}</div>
+      </div>` : ''}
+
       ${doctorsHtml}
+
       <div class="dp-actions">${phoneHtml}${websiteHtml}${mapsHtml}</div>
-      <div class="dp-verified-stamp"><i class="fas fa-shield-alt"></i> Information source: ${h.source || 'Official/verified source'} &nbsp;·&nbsp; Last researched: ${h.last_verified || 'September 2026'}</div>
+      <div class="dp-verified-stamp"><i class="fas fa-shield-alt"></i> Source: ${h.source || 'Official/verified'} &nbsp;·&nbsp; Researched: ${h.last_verified || 'September 2026'}</div>
     </div>`;
+}
 }
 
 function detectLocation() {
