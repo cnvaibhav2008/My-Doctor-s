@@ -285,6 +285,7 @@ async function logout() {
   $('userActions').style.display = 'none';
   $('userDropdown').classList.remove('open');
   if ($('welcomeStrip')) $('welcomeStrip').style.display = 'none';
+  updateMobileWelcome(null);
   showToast('Logged out successfully', 'info');
   showPage('home');
 }
@@ -322,6 +323,8 @@ function updateWelcomeStrip(user) {
       ? `<img src="${user.profile_image}" style="width:100%;height:100%;border-radius:50%;object-fit:cover" onerror="this.outerHTML='${initials}'">`
       : initials;
   }
+  // Also update mobile home welcome
+  updateMobileWelcome(user);
 }
 
 function toggleUserMenu() {
@@ -389,6 +392,7 @@ function quickSearch(spec) {
 
 function filterBySpec(spec) {
   showPage('findDoctors');
+  setBottomNav('bnDoctors');
   setTimeout(() => {
     // Map generic spec names to our HD dropdown values
     const specMap = {
@@ -405,6 +409,49 @@ function filterBySpec(spec) {
     if ($('doctorSearch')) $('doctorSearch').value = spec;
     loadDoctors();
   }, 300);
+}
+
+// Mobile home search functions
+function mobileHomeSearch() {
+  const query = ($('mhSearchInput')?.value || '').trim();
+  if (!query) return;
+  showPage('findDoctors');
+  setBottomNav('bnDoctors');
+  setTimeout(() => {
+    if ($('doctorSearch')) $('doctorSearch').value = query;
+    loadDoctors();
+  }, 300);
+}
+
+function mobileQuickSearch(term) {
+  showPage('findDoctors');
+  setBottomNav('bnDoctors');
+  setTimeout(() => {
+    if ($('doctorSearch')) $('doctorSearch').value = term;
+    loadDoctors();
+  }, 300);
+}
+
+// Update mobile welcome greeting when user logs in/out
+function updateMobileWelcome(user) {
+  const greeting = $('mhGreeting');
+  const avatar = $('mhAvatar');
+  if (!greeting) return;
+  if (!user) {
+    greeting.textContent = 'Welcome';
+    if (avatar) avatar.innerHTML = '<i class="fas fa-user-circle"></i>';
+    return;
+  }
+  const firstName = user.name ? user.name.split(' ')[0] : '';
+  greeting.textContent = firstName ? `Hello, ${firstName} 👋` : 'Welcome back 👋';
+  if (avatar) {
+    const initials = user.name
+      ? user.name.split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase()
+      : '?';
+    avatar.innerHTML = user.profile_image
+      ? `<img src="${user.profile_image}" alt="avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover" onerror="this.innerHTML='${initials}'">`
+      : `<span style="font-size:1rem;font-weight:700;color:var(--primary)">${initials}</span>`;
+  }
 }
 
 // ─── FIND DOCTORS ─────────────────────────────────────
@@ -1126,7 +1173,6 @@ async function showHospitalProfile(hospitalId) {
       <div class="dp-actions">${phoneHtml}${websiteHtml}${mapsHtml}</div>
       <div class="dp-verified-stamp"><i class="fas fa-shield-alt"></i> Source: ${h.source || 'Official/verified'} &nbsp;·&nbsp; Researched: ${h.last_verified || 'September 2026'}</div>
     </div>`;
-}
 }
 
 function detectLocation() {

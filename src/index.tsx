@@ -1740,8 +1740,146 @@ app.get('*', (c) => {
     </div>
   </div>
 
-  <!-- HERO SECTION -->
-  <section class="hero">
+  <!-- ═══════════ MOBILE-ONLY HOME (hidden on desktop) ═══════════ -->
+  <div class="mobile-home" id="mobileHome">
+
+    <!-- Mobile Welcome Header -->
+    <div class="mh-welcome" id="mhWelcome">
+      <div class="mh-welcome-text">
+        <div class="mh-greeting" id="mhGreeting">Welcome</div>
+        <div class="mh-sub">Your healthcare, all in one place.</div>
+      </div>
+      <div class="mh-welcome-avatar" id="mhAvatar" onclick="showPage('profile')">
+        <i class="fas fa-user-circle"></i>
+      </div>
+    </div>
+
+    <!-- Mobile Search Bar -->
+    <div class="mh-search-wrap">
+      <div class="mh-search-box" onclick="document.getElementById('mhSearchInput').focus()">
+        <i class="fas fa-search mh-search-icon"></i>
+        <input
+          type="text"
+          id="mhSearchInput"
+          class="mh-search-input"
+          placeholder="Search doctors, hospitals, specialties..."
+          onkeydown="if(event.key==='Enter') mobileHomeSearch()"
+          autocomplete="off"
+        >
+        <button class="mh-search-btn" onclick="mobileHomeSearch()" aria-label="Search">
+          <i class="fas fa-arrow-right"></i>
+        </button>
+      </div>
+      <div class="mh-quick-tags">
+        <span class="mh-tag" onclick="mobileQuickSearch('heart')"><i class="fas fa-heart"></i> Heart</span>
+        <span class="mh-tag" onclick="mobileQuickSearch('bone')"><i class="fas fa-bone"></i> Bone</span>
+        <span class="mh-tag" onclick="mobileQuickSearch('fever')"><i class="fas fa-thermometer-half"></i> Fever</span>
+        <span class="mh-tag" onclick="mobileQuickSearch('child')"><i class="fas fa-child"></i> Child</span>
+        <span class="mh-tag" onclick="mobileQuickSearch('kidney')"><i class="fas fa-tint"></i> Kidney</span>
+        <span class="mh-tag" onclick="mobileQuickSearch('skin')"><i class="fas fa-allergies"></i> Skin</span>
+      </div>
+    </div>
+
+    <!-- Primary Action Cards (2×2 prominent) -->
+    <div class="mh-primary-grid">
+
+      <div class="mh-primary-card mh-card-doctor" onclick="showPage('findDoctors'); setBottomNav('bnDoctors')">
+        <div class="mh-pcard-icon"><i class="fas fa-user-md"></i></div>
+        <div class="mh-pcard-label">Find a Doctor</div>
+        <div class="mh-pcard-desc">Search verified specialists</div>
+        <div class="mh-pcard-cta">Find Now <i class="fas fa-arrow-right"></i></div>
+      </div>
+
+      <div class="mh-primary-card mh-card-hospital" onclick="showPage('nearby')">
+        <div class="mh-pcard-icon"><i class="fas fa-hospital-alt"></i></div>
+        <div class="mh-pcard-label">Nearby Hospitals</div>
+        <div class="mh-pcard-desc">Emergency, ICU &amp; specialists</div>
+        <div class="mh-pcard-cta">View Hospitals <i class="fas fa-arrow-right"></i></div>
+      </div>
+
+      <div class="mh-primary-card mh-card-ai" onclick="showPage('aiChecker'); setBottomNav('bnAI')">
+        <div class="mh-pcard-icon"><i class="fas fa-robot"></i></div>
+        <div class="mh-pcard-label">AI Symptom Check</div>
+        <div class="mh-pcard-desc">Get AI health guidance</div>
+        <div class="mh-pcard-cta">Check Symptoms <i class="fas fa-arrow-right"></i></div>
+      </div>
+
+      <div class="mh-primary-card mh-card-appts" onclick="showPage('appointments'); setBottomNav('bnAppts')">
+        <div class="mh-pcard-icon"><i class="fas fa-calendar-check"></i></div>
+        <div class="mh-pcard-label">My Appointments</div>
+        <div class="mh-pcard-desc">View &amp; manage bookings</div>
+        <div class="mh-pcard-cta">View All <i class="fas fa-arrow-right"></i></div>
+      </div>
+
+    </div>
+
+    <!-- MedBot Feature Strip -->
+    <div class="mh-medbot-strip" onclick="showPage('chat'); setBottomNav('bnChat')">
+      <div class="mh-medbot-icon"><i class="fas fa-comment-medical"></i></div>
+      <div class="mh-medbot-body">
+        <div class="mh-medbot-title">MedBot — AI Health Assistant</div>
+        <div class="mh-medbot-sub">Ask any health, medicine or wellness question</div>
+      </div>
+      <div class="mh-medbot-arrow"><i class="fas fa-chevron-right"></i></div>
+    </div>
+
+    <!-- Services Grid (compact 3-col icons) -->
+    <div class="mh-services-section">
+      <div class="mh-services-title">More Services</div>
+      <div class="mh-services-grid">
+        <button class="mh-service-item" onclick="showPage('reports')">
+          <div class="mh-svc-icon" style="background:#EEF2FF;color:#6366F1"><i class="fas fa-file-medical-alt"></i></div>
+          <span>Health Records</span>
+        </button>
+        <button class="mh-service-item" onclick="filterBySpec('Cardiology')">
+          <div class="mh-svc-icon" style="background:#FEE2E2;color:#EF4444"><i class="fas fa-heart"></i></div>
+          <span>Cardiology</span>
+        </button>
+        <button class="mh-service-item" onclick="filterBySpec('Orthopaedics')">
+          <div class="mh-svc-icon" style="background:#EFF6FF;color:#3B82F6"><i class="fas fa-bone"></i></div>
+          <span>Orthopaedics</span>
+        </button>
+        <button class="mh-service-item" onclick="filterBySpec('Paediatrics')">
+          <div class="mh-svc-icon" style="background:#ECFDF5;color:#10B981"><i class="fas fa-child"></i></div>
+          <span>Paediatrics</span>
+        </button>
+        <button class="mh-service-item" onclick="filterBySpec('Neuro')">
+          <div class="mh-svc-icon" style="background:#F5F3FF;color:#7C3AED"><i class="fas fa-brain"></i></div>
+          <span>Neurology</span>
+        </button>
+        <button class="mh-service-item" onclick="filterBySpec('Nephrology')">
+          <div class="mh-svc-icon" style="background:#ECFEFF;color:#06B6D4"><i class="fas fa-tint"></i></div>
+          <span>Nephrology</span>
+        </button>
+        <button class="mh-service-item" onclick="filterBySpec('Gynecologist')">
+          <div class="mh-svc-icon" style="background:#FFF7ED;color:#F97316"><i class="fas fa-female"></i></div>
+          <span>OBG</span>
+        </button>
+        <button class="mh-service-item" onclick="filterBySpec('Oncologist')">
+          <div class="mh-svc-icon" style="background:#FDF2F8;color:#EC4899"><i class="fas fa-ribbon"></i></div>
+          <span>Oncology</span>
+        </button>
+        <button class="mh-service-item" onclick="filterBySpec('Gastroenterologist')">
+          <div class="mh-svc-icon" style="background:#FFF8F0;color:#D97706"><i class="fas fa-stomach"></i></div>
+          <span>Gastro</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Trust Strip -->
+    <div class="mh-trust-strip">
+      <div class="mh-trust-item"><span class="mh-trust-num">36+</span><span class="mh-trust-lbl">Verified Doctors</span></div>
+      <div class="mh-trust-div"></div>
+      <div class="mh-trust-item"><span class="mh-trust-num">24</span><span class="mh-trust-lbl">Hospitals Listed</span></div>
+      <div class="mh-trust-div"></div>
+      <div class="mh-trust-item"><span class="mh-trust-num">HD</span><span class="mh-trust-lbl">Region Focused</span></div>
+    </div>
+
+  </div>
+  <!-- END MOBILE HOME -->
+
+  <!-- HERO SECTION (desktop only — hidden on mobile) -->
+  <section class="hero desktop-only-hero">
     <div class="hero-bg">
       <div class="hero-blob blob1"></div>
       <div class="hero-blob blob2"></div>
@@ -2629,17 +2767,18 @@ app.get('*', (c) => {
 </div>
 
 <!-- ═══════════════ PWA INSTALL BANNER ═══════════════ -->
+<!-- On mobile: fixed at top below header. On desktop: fixed bottom-right corner. -->
 <div id="pwaInstallBanner" class="pwa-install-banner" style="display:none">
   <div class="pwa-banner-icon">
     <img src="/icons/icon-72x72.png" alt="MyDoctor's">
   </div>
   <div class="pwa-banner-text">
     <strong>Install MyDoctor's</strong>
-    <span>Add to home screen for quick access</span>
+    <span>Quick access from your home screen</span>
   </div>
   <div class="pwa-banner-actions">
     <button class="pwa-install-btn" id="pwaInstallBtn" onclick="triggerPWAInstall()">Install</button>
-    <button class="pwa-dismiss-btn" onclick="dismissInstallBanner()"><i class="fas fa-times"></i></button>
+    <button class="pwa-dismiss-btn" onclick="dismissInstallBanner()" aria-label="Dismiss"><i class="fas fa-times"></i></button>
   </div>
 </div>
 
@@ -2653,8 +2792,8 @@ app.get('*', (c) => {
     <i class="fas fa-stethoscope"></i>
     <span>Doctors</span>
   </button>
-  <button class="bottom-nav-item bottom-nav-center" id="bnAI" onclick="showPage('aiChecker'); setBottomNav('bnAI')" aria-label="AI Checker">
-    <div class="bottom-nav-fab">
+  <button class="bottom-nav-item bottom-nav-ai" id="bnAI" onclick="showPage('aiChecker'); setBottomNav('bnAI')" aria-label="AI Check">
+    <div class="bottom-nav-ai-pill">
       <i class="fas fa-robot"></i>
     </div>
     <span>AI Check</span>
