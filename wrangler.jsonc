@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mydoctors",
+  "compatibility_date": "2026-03-18",
+  "pages_build_output_dir": "./dist",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mydoctors-production",
+      "database_id": "1b9f4886-eef2-4bb8-ab94-d4cc1f342ab5"
+    }
+  ]
+}
