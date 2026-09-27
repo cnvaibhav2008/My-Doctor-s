@@ -28,114 +28,151 @@ function safeJson(val: any, fallback: any): any {
 // Used by /api/doctors to expand a search term into relevant specializations.
 // Keys use DB-exact specialization strings so LIKE '%value%' matches correctly.
 const SYMPTOM_SPEC_MAP: Record<string, string[]> = {
-  // ── Cardiac ─────────────────────────────────────────────────────────
-  'heart':         ['Cardiologist','Cardiovascular','Cardiac'],
-  'cardiac':       ['Cardiologist','Cardiovascular','Cardiac'],
-  'chest pain':    ['Cardiologist','Cardiovascular','General Medicine'],
-  'chest':         ['Cardiologist','Cardiovascular','General Medicine'],
-  'palpitation':   ['Cardiologist'],
-  'blood pressure':['Cardiologist','General Medicine','Nephrologist'],
-  'hypertension':  ['Cardiologist','General Medicine','Nephrologist'],
-  'cholesterol':   ['Cardiologist','General Medicine'],
-  // ── Orthopaedic ─────────────────────────────────────────────────────
-  'bone':          ['Orthopaedic','Orthopedic'],
-  'joint':         ['Orthopaedic','Orthopedic','General Medicine'],
-  'knee':          ['Orthopaedic','Orthopedic'],
-  'back pain':     ['Orthopaedic','Orthopedic','Neurosurgeon'],
-  'spine':         ['Orthopaedic','Orthopedic','Neurosurgeon'],
-  'fracture':      ['Orthopaedic','Orthopedic'],
-  'shoulder':      ['Orthopaedic','Orthopedic'],
-  'hip':           ['Orthopaedic','Orthopedic'],
-  'sports':        ['Orthopaedic','Orthopedic'],
-  'arthritis':     ['Orthopaedic','Orthopedic','General Medicine'],
-  'ligament':      ['Orthopaedic','Orthopedic'],
-  // ── OBG / Women ─────────────────────────────────────────────────────
-  'pregnancy':     ['Gynecologist'],
-  'gynecolog':     ['Gynecologist'],
-  'obstetrics':    ['Gynecologist'],
-  'women':         ['Gynecologist'],
-  'menstrual':     ['Gynecologist'],
-  'uterus':        ['Gynecologist'],
-  'fetal':         ['Gynecologist'],
-  'delivery':      ['Gynecologist'],
-  // ── Paediatrics ─────────────────────────────────────────────────────
-  'child':         ['Pediatrician','Pediatric','Paediatrician'],
-  'baby':          ['Pediatrician','Pediatric','Paediatrician'],
-  'infant':        ['Pediatrician','Pediatric','Paediatrician'],
-  'kids':          ['Pediatrician','Pediatric','Paediatrician'],
-  'newborn':       ['Pediatrician','Pediatric','Paediatrician'],
-  // ── Neuro ────────────────────────────────────────────────────────────
-  'brain':         ['Neurosurgeon'],
-  'headache':      ['Neurosurgeon','General Medicine'],
-  'stroke':        ['Neurosurgeon'],
-  'seizure':       ['Neurosurgeon'],
-  'epilepsy':      ['Neurosurgeon'],
-  'nerve':         ['Neurosurgeon'],
-  'paralysis':     ['Neurosurgeon'],
-  // ── Kidney / Nephrology ──────────────────────────────────────────────
-  'kidney':        ['Nephrologist','Urologist'],
-  'renal':         ['Nephrologist'],
-  'dialysis':      ['Nephrologist'],
-  // ── Urology ──────────────────────────────────────────────────────────
-  'urine':         ['Urologist','Nephrologist'],
-  'prostate':      ['Urologist'],
-  'bladder':       ['Urologist'],
-  'urolog':        ['Urologist','Nephrologist'],
-  'kidney stone':  ['Urologist','Nephrologist'],
-  // ── Gastroenterology ─────────────────────────────────────────────────
-  'stomach':       ['Gastroenterologist','General Medicine'],
-  'liver':         ['Gastroenterologist','General Medicine'],
-  'digestion':     ['Gastroenterologist','General Medicine'],
-  'gastro':        ['Gastroenterologist'],
-  'abdom':         ['Gastroenterologist','General Surgeon'],
-  'gut':           ['Gastroenterologist'],
-  'acidity':       ['Gastroenterologist','General Medicine'],
-  // ── Cancer / Oncology ────────────────────────────────────────────────
-  'cancer':        ['Oncologist'],
-  'tumor':         ['Oncologist'],
-  'oncolog':       ['Oncologist'],
-  // ── General / Fever ──────────────────────────────────────────────────
-  'fever':         ['General Medicine'],
-  'cold':          ['General Medicine'],
-  'flu':           ['General Medicine'],
-  'fatigue':       ['General Medicine'],
-  'diabetes':      ['General Medicine'],
-  'thyroid':       ['General Medicine'],
-  'hormone':       ['General Medicine'],
-  // ── Skin / Dermatology ───────────────────────────────────────────────
-  'skin':          ['Dermatologist','Dermatology'],
-  'rash':          ['Dermatologist','Dermatology','General Medicine'],
-  'acne':          ['Dermatologist','Dermatology'],
-  'eczema':        ['Dermatologist','Dermatology'],
-  'psoriasis':     ['Dermatologist','Dermatology'],
-  // ── Eye / Ophthalmology ──────────────────────────────────────────────
-  'eye':           ['Ophthalmologist','Ophthalmology'],
-  'vision':        ['Ophthalmologist','Ophthalmology'],
-  'cataract':      ['Ophthalmologist','Ophthalmology'],
-  'glaucoma':      ['Ophthalmologist','Ophthalmology'],
-  // ── ENT ──────────────────────────────────────────────────────────────
-  'ear':           ['ENT'],
-  'nose':          ['ENT'],
-  'throat':        ['ENT','General Medicine'],
-  'hearing':       ['ENT'],
-  'tonsil':        ['ENT'],
-  // ── Surgery ──────────────────────────────────────────────────────────
-  'surgery':       ['General Surgeon','Plastic Surgeon','Neurosurgeon'],
-  'hernia':        ['General Surgeon'],
-  'appendix':      ['General Surgeon'],
-  'gallstone':     ['General Surgeon'],
-  'plastic':       ['Plastic Surgeon'],
-  // ── Dental ───────────────────────────────────────────────────────────
-  'dental':        ['Dentist'],
-  'tooth':         ['Dentist'],
-  'teeth':         ['Dentist'],
-  'gum':           ['Dentist'],
-  // ── Radiology ────────────────────────────────────────────────────────
-  'radiology':     ['Interventional Radiologist'],
-  'scan':          ['Interventional Radiologist'],
-  'mri':           ['Interventional Radiologist'],
-  // ── Anaesthesia ──────────────────────────────────────────────────────
-  'anaesthesia':   ['Anaesthesiologist'],
+  // ── Cardiac / Heart ──────────────────────────────────────────────
+  'heart':              ['Cardiologist','Cardiovascular Surgeon'],
+  'cardiac':            ['Cardiologist','Cardiovascular Surgeon'],
+  'chest pain':         ['Cardiologist','General Medicine'],
+  'chest':              ['Cardiologist','General Medicine'],
+  'palpitation':        ['Cardiologist'],
+  'blood pressure':     ['Cardiologist','General Medicine','Nephrologist'],
+  'hypertension':       ['Cardiologist','General Medicine','Nephrologist'],
+  'cholesterol':        ['Cardiologist','General Medicine'],
+  'cardiolog':          ['Cardiologist'],
+  'cardiovascular':     ['Cardiologist','Cardiovascular Surgeon'],
+  'interventional':     ['Cardiologist'],
+  // ── Orthopaedic ─────────────────────────────────────────────────
+  'bone':               ['Orthopaedic','Orthopedic'],
+  'joint':              ['Orthopaedic','Orthopedic','General Medicine'],
+  'knee':               ['Orthopaedic','Orthopedic'],
+  'back pain':          ['Orthopaedic','Orthopedic','Neurosurgeon'],
+  'spine':              ['Orthopaedic','Orthopedic','Neurosurgeon'],
+  'fracture':           ['Orthopaedic','Orthopedic'],
+  'shoulder':           ['Orthopaedic','Orthopedic'],
+  'hip':                ['Orthopaedic','Orthopedic'],
+  'sports':             ['Orthopaedic','Orthopedic'],
+  'arthritis':          ['Orthopaedic','Orthopedic','General Medicine'],
+  'ligament':           ['Orthopaedic','Orthopedic'],
+  'ortho':              ['Orthopaedic','Orthopedic'],
+  'joint replacement':  ['Orthopaedic','Orthopedic'],
+  // ── OBG / Women ─────────────────────────────────────────────────
+  'pregnancy':          ['Gynecologist'],
+  'gynecolog':          ['Gynecologist'],
+  'obstetrics':         ['Gynecologist'],
+  'gynae':              ['Gynecologist'],
+  'obg':                ['Gynecologist'],
+  'women':              ['Gynecologist'],
+  'menstrual':          ['Gynecologist'],
+  'uterus':             ['Gynecologist'],
+  'fetal':              ['Gynecologist'],
+  'delivery':           ['Gynecologist'],
+  'gynaecolog':         ['Gynecologist'],
+  // ── Paediatrics ─────────────────────────────────────────────────
+  'child':              ['Pediatrician','Pediatric Surgeon','Pediatric Cardiologist'],
+  'baby':               ['Pediatrician','Pediatric Surgeon'],
+  'infant':             ['Pediatrician','Pediatric Surgeon'],
+  'kids':               ['Pediatrician','Pediatric Surgeon'],
+  'newborn':            ['Pediatrician'],
+  'paediatr':           ['Pediatrician','Pediatric Surgeon','Pediatric Cardiologist'],
+  'pediatr':            ['Pediatrician','Pediatric Surgeon','Pediatric Cardiologist'],
+  // ── Neuro ────────────────────────────────────────────────────────
+  'brain':              ['Neurosurgeon','Neurologist'],
+  'headache':           ['Neurologist','Neurosurgeon','General Medicine'],
+  'stroke':             ['Neurologist','Neurosurgeon'],
+  'seizure':            ['Neurologist','Neurosurgeon'],
+  'epilepsy':           ['Neurologist','Neurosurgeon'],
+  'nerve':              ['Neurologist','Neurosurgeon'],
+  'paralysis':          ['Neurologist','Neurosurgeon'],
+  'neuro':              ['Neurologist','Neurosurgeon'],
+  'neurosurg':          ['Neurosurgeon'],
+  'neurolog':           ['Neurologist'],
+  'migraine':           ['Neurologist','General Medicine'],
+  'parkinson':          ['Neurologist'],
+  'dementia':           ['Neurologist'],
+  'neuropathy':         ['Neurologist'],
+  'multiple sclerosis': ['Neurologist'],
+  'vertigo':            ['Neurologist','ENT'],
+  // ── Kidney / Nephrology ──────────────────────────────────────────
+  'kidney':             ['Nephrologist','Urologist'],
+  'renal':              ['Nephrologist'],
+  'dialysis':           ['Nephrologist'],
+  'nephr':              ['Nephrologist'],
+  // ── Urology ──────────────────────────────────────────────────────
+  'urine':              ['Urologist','Nephrologist'],
+  'prostate':           ['Urologist'],
+  'bladder':            ['Urologist'],
+  'urolog':             ['Urologist','Nephrologist'],
+  'kidney stone':       ['Urologist','Nephrologist'],
+  // ── Gastroenterology ─────────────────────────────────────────────
+  'stomach':            ['Gastroenterologist','General Medicine'],
+  'liver':              ['Gastroenterologist','General Medicine'],
+  'digestion':          ['Gastroenterologist','General Medicine'],
+  'gastro':             ['Gastroenterologist'],
+  'abdom':              ['Gastroenterologist','General Surgeon'],
+  'gut':                ['Gastroenterologist'],
+  'acidity':            ['Gastroenterologist','General Medicine'],
+  'gastroenterolog':    ['Gastroenterologist'],
+  // ── Cancer / Oncology ────────────────────────────────────────────
+  'cancer':             ['Oncologist'],
+  'tumor':              ['Oncologist'],
+  'oncolog':            ['Oncologist'],
+  // ── General / Fever ──────────────────────────────────────────────
+  'fever':              ['General Medicine'],
+  'cold':               ['General Medicine'],
+  'flu':                ['General Medicine'],
+  'fatigue':            ['General Medicine'],
+  'diabetes':           ['General Medicine'],
+  'thyroid':            ['General Medicine'],
+  'hormone':            ['General Medicine'],
+  'general medicine':   ['General Medicine'],
+  'diabetolog':         ['General Medicine'],
+  // ── Skin / Dermatology ───────────────────────────────────────────
+  'skin':               ['Dermatologist'],
+  'rash':               ['Dermatologist','General Medicine'],
+  'acne':               ['Dermatologist'],
+  'eczema':             ['Dermatologist'],
+  'psoriasis':          ['Dermatologist'],
+  'dermatolog':         ['Dermatologist'],
+  // ── Eye / Ophthalmology ──────────────────────────────────────────
+  'eye':                ['Ophthalmologist'],
+  'vision':             ['Ophthalmologist'],
+  'cataract':           ['Ophthalmologist'],
+  'glaucoma':           ['Ophthalmologist'],
+  'ophthal':            ['Ophthalmologist'],
+  // ── ENT ──────────────────────────────────────────────────────────
+  'ear':                ['ENT'],
+  'nose':               ['ENT'],
+  'throat':             ['ENT','General Medicine'],
+  'hearing':            ['ENT'],
+  'tonsil':             ['ENT'],
+  'ent':                ['ENT'],
+  // ── Surgery ──────────────────────────────────────────────────────
+  'surgery':            ['General Surgeon','Plastic Surgeon','Neurosurgeon'],
+  'hernia':             ['General Surgeon'],
+  'appendix':           ['General Surgeon'],
+  'gallstone':          ['General Surgeon'],
+  'plastic':            ['Plastic Surgeon'],
+  // ── Dental ───────────────────────────────────────────────────────
+  'dental':             ['Dentist'],
+  'tooth':              ['Dentist'],
+  'teeth':              ['Dentist'],
+  'gum':                ['Dentist'],
+  // ── Radiology ────────────────────────────────────────────────────
+  'radiology':          ['Interventional Radiologist'],
+  'scan':               ['Interventional Radiologist'],
+  'mri':                ['Interventional Radiologist'],
+  // ── Psychiatry / Mental Health ────────────────────────────────────
+  'mental':             ['Psychiatrist'],
+  'depression':         ['Psychiatrist'],
+  'anxiety':            ['Psychiatrist'],
+  'psychiatr':          ['Psychiatrist'],
+  // ── Respiratory ──────────────────────────────────────────────────
+  'lung':               ['Pulmonologist'],
+  'breath':             ['Pulmonologist','General Medicine'],
+  'asthma':             ['Pulmonologist','General Medicine'],
+  'respiratory':        ['Pulmonologist'],
+  'pulmonolog':         ['Pulmonologist'],
+  // ── Anaesthesia ──────────────────────────────────────────────────
+  'anaesthesia':        ['Anaesthesiologist'],
 }
 
 // Returns an array of specialization substrings that match the search term
@@ -1740,146 +1777,8 @@ app.get('*', (c) => {
     </div>
   </div>
 
-  <!-- ═══════════ MOBILE-ONLY HOME (hidden on desktop) ═══════════ -->
-  <div class="mobile-home" id="mobileHome">
-
-    <!-- Mobile Welcome Header -->
-    <div class="mh-welcome" id="mhWelcome">
-      <div class="mh-welcome-text">
-        <div class="mh-greeting" id="mhGreeting">Welcome</div>
-        <div class="mh-sub">Your healthcare, all in one place.</div>
-      </div>
-      <div class="mh-welcome-avatar" id="mhAvatar" onclick="showPage('profile')">
-        <i class="fas fa-user-circle"></i>
-      </div>
-    </div>
-
-    <!-- Mobile Search Bar -->
-    <div class="mh-search-wrap">
-      <div class="mh-search-box" onclick="document.getElementById('mhSearchInput').focus()">
-        <i class="fas fa-search mh-search-icon"></i>
-        <input
-          type="text"
-          id="mhSearchInput"
-          class="mh-search-input"
-          placeholder="Search doctors, hospitals, specialties..."
-          onkeydown="if(event.key==='Enter') mobileHomeSearch()"
-          autocomplete="off"
-        >
-        <button class="mh-search-btn" onclick="mobileHomeSearch()" aria-label="Search">
-          <i class="fas fa-arrow-right"></i>
-        </button>
-      </div>
-      <div class="mh-quick-tags">
-        <span class="mh-tag" onclick="mobileQuickSearch('heart')"><i class="fas fa-heart"></i> Heart</span>
-        <span class="mh-tag" onclick="mobileQuickSearch('bone')"><i class="fas fa-bone"></i> Bone</span>
-        <span class="mh-tag" onclick="mobileQuickSearch('fever')"><i class="fas fa-thermometer-half"></i> Fever</span>
-        <span class="mh-tag" onclick="mobileQuickSearch('child')"><i class="fas fa-child"></i> Child</span>
-        <span class="mh-tag" onclick="mobileQuickSearch('kidney')"><i class="fas fa-tint"></i> Kidney</span>
-        <span class="mh-tag" onclick="mobileQuickSearch('skin')"><i class="fas fa-allergies"></i> Skin</span>
-      </div>
-    </div>
-
-    <!-- Primary Action Cards (2×2 prominent) -->
-    <div class="mh-primary-grid">
-
-      <div class="mh-primary-card mh-card-doctor" onclick="showPage('findDoctors'); setBottomNav('bnDoctors')">
-        <div class="mh-pcard-icon"><i class="fas fa-user-md"></i></div>
-        <div class="mh-pcard-label">Find a Doctor</div>
-        <div class="mh-pcard-desc">Search verified specialists</div>
-        <div class="mh-pcard-cta">Find Now <i class="fas fa-arrow-right"></i></div>
-      </div>
-
-      <div class="mh-primary-card mh-card-hospital" onclick="showPage('nearby')">
-        <div class="mh-pcard-icon"><i class="fas fa-hospital-alt"></i></div>
-        <div class="mh-pcard-label">Nearby Hospitals</div>
-        <div class="mh-pcard-desc">Emergency, ICU &amp; specialists</div>
-        <div class="mh-pcard-cta">View Hospitals <i class="fas fa-arrow-right"></i></div>
-      </div>
-
-      <div class="mh-primary-card mh-card-ai" onclick="showPage('aiChecker'); setBottomNav('bnAI')">
-        <div class="mh-pcard-icon"><i class="fas fa-robot"></i></div>
-        <div class="mh-pcard-label">AI Symptom Check</div>
-        <div class="mh-pcard-desc">Get AI health guidance</div>
-        <div class="mh-pcard-cta">Check Symptoms <i class="fas fa-arrow-right"></i></div>
-      </div>
-
-      <div class="mh-primary-card mh-card-appts" onclick="showPage('appointments'); setBottomNav('bnAppts')">
-        <div class="mh-pcard-icon"><i class="fas fa-calendar-check"></i></div>
-        <div class="mh-pcard-label">My Appointments</div>
-        <div class="mh-pcard-desc">View &amp; manage bookings</div>
-        <div class="mh-pcard-cta">View All <i class="fas fa-arrow-right"></i></div>
-      </div>
-
-    </div>
-
-    <!-- MedBot Feature Strip -->
-    <div class="mh-medbot-strip" onclick="showPage('chat'); setBottomNav('bnChat')">
-      <div class="mh-medbot-icon"><i class="fas fa-comment-medical"></i></div>
-      <div class="mh-medbot-body">
-        <div class="mh-medbot-title">MedBot — AI Health Assistant</div>
-        <div class="mh-medbot-sub">Ask any health, medicine or wellness question</div>
-      </div>
-      <div class="mh-medbot-arrow"><i class="fas fa-chevron-right"></i></div>
-    </div>
-
-    <!-- Services Grid (compact 3-col icons) -->
-    <div class="mh-services-section">
-      <div class="mh-services-title">More Services</div>
-      <div class="mh-services-grid">
-        <button class="mh-service-item" onclick="showPage('reports')">
-          <div class="mh-svc-icon" style="background:#EEF2FF;color:#6366F1"><i class="fas fa-file-medical-alt"></i></div>
-          <span>Health Records</span>
-        </button>
-        <button class="mh-service-item" onclick="filterBySpec('Cardiology')">
-          <div class="mh-svc-icon" style="background:#FEE2E2;color:#EF4444"><i class="fas fa-heart"></i></div>
-          <span>Cardiology</span>
-        </button>
-        <button class="mh-service-item" onclick="filterBySpec('Orthopaedics')">
-          <div class="mh-svc-icon" style="background:#EFF6FF;color:#3B82F6"><i class="fas fa-bone"></i></div>
-          <span>Orthopaedics</span>
-        </button>
-        <button class="mh-service-item" onclick="filterBySpec('Paediatrics')">
-          <div class="mh-svc-icon" style="background:#ECFDF5;color:#10B981"><i class="fas fa-child"></i></div>
-          <span>Paediatrics</span>
-        </button>
-        <button class="mh-service-item" onclick="filterBySpec('Neuro')">
-          <div class="mh-svc-icon" style="background:#F5F3FF;color:#7C3AED"><i class="fas fa-brain"></i></div>
-          <span>Neurology</span>
-        </button>
-        <button class="mh-service-item" onclick="filterBySpec('Nephrology')">
-          <div class="mh-svc-icon" style="background:#ECFEFF;color:#06B6D4"><i class="fas fa-tint"></i></div>
-          <span>Nephrology</span>
-        </button>
-        <button class="mh-service-item" onclick="filterBySpec('Gynecologist')">
-          <div class="mh-svc-icon" style="background:#FFF7ED;color:#F97316"><i class="fas fa-female"></i></div>
-          <span>OBG</span>
-        </button>
-        <button class="mh-service-item" onclick="filterBySpec('Oncologist')">
-          <div class="mh-svc-icon" style="background:#FDF2F8;color:#EC4899"><i class="fas fa-ribbon"></i></div>
-          <span>Oncology</span>
-        </button>
-        <button class="mh-service-item" onclick="filterBySpec('Gastroenterologist')">
-          <div class="mh-svc-icon" style="background:#FFF8F0;color:#D97706"><i class="fas fa-stomach"></i></div>
-          <span>Gastro</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Trust Strip -->
-    <div class="mh-trust-strip">
-      <div class="mh-trust-item"><span class="mh-trust-num">36+</span><span class="mh-trust-lbl">Verified Doctors</span></div>
-      <div class="mh-trust-div"></div>
-      <div class="mh-trust-item"><span class="mh-trust-num">24</span><span class="mh-trust-lbl">Hospitals Listed</span></div>
-      <div class="mh-trust-div"></div>
-      <div class="mh-trust-item"><span class="mh-trust-num">HD</span><span class="mh-trust-lbl">Region Focused</span></div>
-    </div>
-
-  </div>
-  <!-- END MOBILE HOME -->
-
-  <!-- HERO SECTION (desktop only — hidden on mobile) -->
-  <section class="hero desktop-only-hero">
+  <!-- HERO SECTION -->
+  <section class="hero">
     <div class="hero-bg">
       <div class="hero-blob blob1"></div>
       <div class="hero-blob blob2"></div>
@@ -1977,72 +1876,72 @@ app.get('*', (c) => {
         <h2>Everything You Need, <span class="gradient-text">In One Place</span></h2>
         <p>All your healthcare tools — doctors, hospitals, AI, and records — right here.</p>
       </div>
-      <div class="qf-grid">
+      <div class="hub-cards-grid">
 
-        <div class="qf-card" onclick="showPage('findDoctors')">
-          <div class="qf-card-icon" style="background:linear-gradient(135deg,#0066FF,#4D8FFF)">
+        <div class="hub-card" onclick="showPage('findDoctors'); setBottomNav('bnDoctors')">
+          <div class="hub-card-icon" style="background:linear-gradient(135deg,#0066FF,#4D8FFF)">
             <i class="fas fa-user-md"></i>
           </div>
-          <div class="qf-card-body">
-            <div class="qf-card-title">Find a Doctor</div>
-            <div class="qf-card-desc">Search verified specialists in Hubballi–Dharwad by name, specialty, or symptom</div>
+          <div class="hub-card-body">
+            <div class="hub-card-title">Find a Doctor</div>
+            <div class="hub-card-desc">Search verified specialists in Hubballi–Dharwad by name, specialty, or symptom</div>
           </div>
-          <div class="qf-card-arrow"><i class="fas fa-arrow-right"></i></div>
+          <div class="hub-card-cta">Find Now <i class="fas fa-arrow-right"></i></div>
         </div>
 
-        <div class="qf-card" onclick="showPage('nearby')">
-          <div class="qf-card-icon" style="background:linear-gradient(135deg,#00C9A7,#00D4B0)">
+        <div class="hub-card" onclick="showPage('nearby')">
+          <div class="hub-card-icon" style="background:linear-gradient(135deg,#00B09B,#00C9A7)">
             <i class="fas fa-hospital-alt"></i>
           </div>
-          <div class="qf-card-body">
-            <div class="qf-card-title">Nearby Hospitals</div>
-            <div class="qf-card-desc">Discover hospitals with emergency care, ICU, and specialist departments near you</div>
+          <div class="hub-card-body">
+            <div class="hub-card-title">Nearby Hospitals</div>
+            <div class="hub-card-desc">Discover hospitals with emergency care, ICU, and specialist departments near you</div>
           </div>
-          <div class="qf-card-arrow"><i class="fas fa-arrow-right"></i></div>
+          <div class="hub-card-cta">View Hospitals <i class="fas fa-arrow-right"></i></div>
         </div>
 
-        <div class="qf-card" onclick="showPage('aiChecker')">
-          <div class="qf-card-icon" style="background:linear-gradient(135deg,#7C3AED,#A855F7)">
+        <div class="hub-card" onclick="showPage('aiChecker'); setBottomNav('bnAI')">
+          <div class="hub-card-icon" style="background:linear-gradient(135deg,#7C3AED,#A855F7)">
             <i class="fas fa-robot"></i>
           </div>
-          <div class="qf-card-body">
-            <div class="qf-card-title">AI Symptom Check</div>
-            <div class="qf-card-desc">Describe your symptoms and get instant AI-powered medical insights and guidance</div>
+          <div class="hub-card-body">
+            <div class="hub-card-title">AI Symptom Check</div>
+            <div class="hub-card-desc">Describe your symptoms and get instant AI-powered medical insights and guidance</div>
           </div>
-          <div class="qf-card-arrow"><i class="fas fa-arrow-right"></i></div>
+          <div class="hub-card-cta">Check Now <i class="fas fa-arrow-right"></i></div>
         </div>
 
-        <div class="qf-card" onclick="showPage('chat')">
-          <div class="qf-card-icon" style="background:linear-gradient(135deg,#FF6B6B,#FF9500)">
+        <div class="hub-card" onclick="showPage('chat'); setBottomNav('bnChat')">
+          <div class="hub-card-icon" style="background:linear-gradient(135deg,#0052CC,#06B6D4)">
             <i class="fas fa-comment-medical"></i>
           </div>
-          <div class="qf-card-body">
-            <div class="qf-card-title">MedBot Chat</div>
-            <div class="qf-card-desc">Ask any health, medicine, or wellness question to our intelligent AI assistant</div>
+          <div class="hub-card-body">
+            <div class="hub-card-title">MedBot Chat</div>
+            <div class="hub-card-desc">Ask any health, medicine, or wellness question to our intelligent AI assistant</div>
           </div>
-          <div class="qf-card-arrow"><i class="fas fa-arrow-right"></i></div>
+          <div class="hub-card-cta">Ask MedBot <i class="fas fa-arrow-right"></i></div>
         </div>
 
-        <div class="qf-card" onclick="showPage('appointments')">
-          <div class="qf-card-icon" style="background:linear-gradient(135deg,#F59E0B,#EF4444)">
+        <div class="hub-card" onclick="showPage('appointments'); setBottomNav('bnAppts')">
+          <div class="hub-card-icon" style="background:linear-gradient(135deg,#EA580C,#F59E0B)">
             <i class="fas fa-calendar-check"></i>
           </div>
-          <div class="qf-card-body">
-            <div class="qf-card-title">My Appointments</div>
-            <div class="qf-card-desc">Book, view and manage your upcoming doctor appointments in one place</div>
+          <div class="hub-card-body">
+            <div class="hub-card-title">My Appointments</div>
+            <div class="hub-card-desc">Book, view and manage your upcoming doctor appointments in one place</div>
           </div>
-          <div class="qf-card-arrow"><i class="fas fa-arrow-right"></i></div>
+          <div class="hub-card-cta">View All <i class="fas fa-arrow-right"></i></div>
         </div>
 
-        <div class="qf-card" onclick="showPage('reports')">
-          <div class="qf-card-icon" style="background:linear-gradient(135deg,#059669,#10B981)">
+        <div class="hub-card" onclick="showPage('reports')">
+          <div class="hub-card-icon" style="background:linear-gradient(135deg,#059669,#10B981)">
             <i class="fas fa-file-medical-alt"></i>
           </div>
-          <div class="qf-card-body">
-            <div class="qf-card-title">Health Records</div>
-            <div class="qf-card-desc">Securely store, access and share your prescriptions, lab reports and medical history</div>
+          <div class="hub-card-body">
+            <div class="hub-card-title">Health Records</div>
+            <div class="hub-card-desc">Securely store, access and share your prescriptions, lab reports and medical history</div>
           </div>
-          <div class="qf-card-arrow"><i class="fas fa-arrow-right"></i></div>
+          <div class="hub-card-cta">View Records <i class="fas fa-arrow-right"></i></div>
         </div>
 
       </div>
@@ -2514,6 +2413,60 @@ app.get('*', (c) => {
   <div class="container" id="doctorDetailContent"></div>
 </div>
 
+<!-- ═══ MedBot Chat Page ═══ -->
+<div id="page-chat" class="page">
+  <div class="container" style="max-width:700px;padding-top:24px;padding-bottom:24px">
+    <div class="section-header" style="margin-bottom:20px">
+      <div class="section-badge"><i class="fas fa-comment-medical"></i> MedBot</div>
+      <h2>AI Health Assistant</h2>
+      <p>Ask any health, medicine, or wellness question</p>
+    </div>
+    <!-- Chat messages area (mirrors chatbot widget) -->
+    <div class="medbot-page-chat-wrap">
+      <div class="medbot-page-messages" id="medbotPageMessages">
+        <div class="chat-bubble bot">
+          <div class="chat-avatar"><i class="fas fa-robot"></i></div>
+          <div class="chat-text">
+            <strong>Hi! I'm MedBot 👋</strong><br>
+            I'm your AI health assistant for MyDoctor's. Ask me about symptoms, medicines, health conditions, or doctors in Hubballi–Dharwad.<br><br>
+            <em>Note: I provide general health information only — not a substitute for professional medical advice.</em>
+          </div>
+        </div>
+      </div>
+      <div class="medbot-page-quick-replies">
+        <button class="quick-reply-btn" onclick="medbotPageSend('What are common symptoms of diabetes?')">Diabetes symptoms</button>
+        <button class="quick-reply-btn" onclick="medbotPageSend('Which doctor should I see for chest pain?')">Chest pain</button>
+        <button class="quick-reply-btn" onclick="medbotPageSend('How to manage high blood pressure?')">Blood pressure</button>
+        <button class="quick-reply-btn" onclick="medbotPageSend('What is the normal range for blood sugar?')">Blood sugar</button>
+      </div>
+      <div class="medbot-page-input-row">
+        <input type="text" id="medbotPageInput" class="medbot-page-input" placeholder="Type your health question..." onkeydown="if(event.key==='Enter')medbotPageSend()">
+        <button class="medbot-page-send-btn" onclick="medbotPageSend()" aria-label="Send"><i class="fas fa-paper-plane"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Health Records Page ═══ -->
+<div id="page-reports" class="page">
+  <div class="container" id="reportsContent" style="padding-top:24px;padding-bottom:24px">
+    <div class="section-header" style="margin-bottom:20px">
+      <div class="section-badge"><i class="fas fa-file-medical-alt"></i> Health Records</div>
+      <h2>My Medical Records</h2>
+      <p>Securely store and access your health documents</p>
+    </div>
+    <div class="auth-gate-msg" id="reportsAuthGate" style="display:none">
+      <div class="empty-state">
+        <i class="fas fa-lock"></i>
+        <h3>Sign In Required</h3>
+        <p>Please sign in to view and manage your health records.</p>
+        <button class="btn-primary" onclick="openModal('loginModal')"><i class="fas fa-sign-in-alt"></i> Sign In</button>
+      </div>
+    </div>
+    <div id="reportsListWrap"></div>
+  </div>
+</div>
+
 <!-- ═══════════════ MODALS ═══════════════ -->
 <!-- Login Modal -->
 <div class="modal-overlay" id="loginModal" onclick="closeModalOnBg(event,'loginModal')">
@@ -2792,10 +2745,8 @@ app.get('*', (c) => {
     <i class="fas fa-stethoscope"></i>
     <span>Doctors</span>
   </button>
-  <button class="bottom-nav-item bottom-nav-ai" id="bnAI" onclick="showPage('aiChecker'); setBottomNav('bnAI')" aria-label="AI Check">
-    <div class="bottom-nav-ai-pill">
-      <i class="fas fa-robot"></i>
-    </div>
+  <button class="bottom-nav-item bottom-nav-center" id="bnAI" onclick="showPage('aiChecker'); setBottomNav('bnAI')" aria-label="AI Check">
+    <div class="bottom-nav-fab"><i class="fas fa-robot"></i></div>
     <span>AI Check</span>
   </button>
   <button class="bottom-nav-item" id="bnAppts" onclick="showPage('appointments'); setBottomNav('bnAppts')" aria-label="Appointments">

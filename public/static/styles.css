@@ -2201,767 +2201,271 @@ button:focus-visible, a:focus-visible {
   .dp-label { min-width: 80px; }
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   MOBILE HOME REDESIGN — All .mh-* component styles
-   Shown only on ≤768px via media query; hidden by default on desktop
-   ═══════════════════════════════════════════════════════════════════ */
-
-/* ─── Visibility toggles ─────────────────────────────────────────── */
-.mobile-home {
-  display: none; /* hidden on desktop; shown in mobile media query below */
+/* ═══════════════════════════════════════════════════════════════
+   YOUR HEALTH HUB — hub-cards-grid
+   ═══════════════════════════════════════════════════════════════ */
+.hub-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(280px,100%), 1fr));
+  gap: clamp(14px,2vw,20px);
+  margin-top: 28px;
 }
 
-/* ─── Bottom Nav: Replace FAB center with flat AI pill ───────────── */
-
-/* Neutralise old FAB styles so they don't interfere */
-.bottom-nav-center {
-  margin-top: 0 !important;
-}
-.bottom-nav-fab {
-  display: none !important;
-}
-
-/* New flat AI pill inside the AI nav button */
-.bottom-nav-ai {
-  /* same flex layout as siblings — no oversized margin */
-  flex: 1;
+.hub-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-}
-
-.bottom-nav-ai-pill {
-  width: 40px;
-  height: 26px;
-  border-radius: 13px;
-  background: linear-gradient(135deg, var(--primary, #0052CC), #4D8FFF);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 0.95rem;
-  transition: transform 0.2s, box-shadow 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 82, 204, 0.35);
-  margin-bottom: 1px;
-}
-
-.bottom-nav-item.bottom-nav-ai.active .bottom-nav-ai-pill,
-.bottom-nav-item.bottom-nav-ai:active .bottom-nav-ai-pill {
-  transform: scale(0.93);
-  box-shadow: 0 1px 5px rgba(0, 82, 204, 0.28);
-}
-
-[data-theme="dark"] .bottom-nav-ai-pill {
-  box-shadow: 0 2px 8px rgba(77, 143, 255, 0.4);
-}
-
-/* ─── PWA Install Banner — Mobile: top-anchored ─────────────────── */
-
-@media (max-width: 768px) {
-  /* Desktop-only hero section hidden on mobile */
-  .desktop-only-hero {
-    display: none !important;
-  }
-
-  /* Mobile home section shown */
-  .mobile-home {
-    display: block;
-  }
-
-  /* Hide the desktop welcome strip on mobile (mobile-home has its own) */
-  .welcome-strip {
-    display: none !important;
-  }
-
-  /* Reposition PWA banner to top — below the navbar, never above bottom nav */
-  .pwa-install-banner {
-    top: calc(56px + env(safe-area-inset-top, 0px) + 6px);
-    bottom: auto !important;
-    left: 10px;
-    right: 10px;
-    border-radius: 12px;
-    padding: 10px 12px;
-    animation: slideDownBanner 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-    z-index: 1050; /* below navbar (typically 1100) but above content */
-  }
-
-  @keyframes slideDownBanner {
-    from { transform: translateY(-60px); opacity: 0; }
-    to   { transform: translateY(0);     opacity: 1; }
-  }
-
-  /* When PWA banner is visible, shift page content down so it isn't covered */
-  .pwa-banner-visible .page {
-    padding-top: calc(72px + env(safe-area-inset-top, 0px));
-  }
-  .pwa-banner-visible .mobile-home {
-    padding-top: 72px;
-  }
-}
-
-/* ─── Mobile Home Wrapper ────────────────────────────────────────── */
-@media (max-width: 768px) {
-  .mobile-home {
-    padding: 12px 14px calc(var(--bottom-nav-height, 60px) + env(safe-area-inset-bottom, 0px) + 20px);
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    min-height: 100vh;
-    box-sizing: border-box;
-  }
-}
-
-/* ─── Welcome Header ─────────────────────────────────────────────── */
-.mh-welcome {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 0 0;
-}
-
-.mh-welcome-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.mh-greeting {
-  font-size: clamp(1.2rem, 5vw, 1.4rem);
-  font-weight: 700;
-  color: var(--text-primary, #111827);
-  line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-[data-theme="dark"] .mh-greeting {
-  color: #F1F5F9;
-}
-
-.mh-sub {
-  font-size: 0.8rem;
-  color: var(--text-muted, #6B7280);
-  margin-top: 2px;
-  font-weight: 400;
-}
-
-[data-theme="dark"] .mh-sub {
-  color: #94A3B8;
-}
-
-.mh-welcome-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary, #0052CC), #4D8FFF);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 1.2rem;
+  gap: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: clamp(18px,2.5vw,24px);
   cursor: pointer;
-  flex-shrink: 0;
-  margin-left: 10px;
-  transition: transform 0.2s, box-shadow 0.2s;
-  box-shadow: 0 2px 10px rgba(0, 82, 204, 0.3);
-  -webkit-tap-highlight-color: transparent;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
-
-.mh-welcome-avatar:active {
-  transform: scale(0.93);
+.hub-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease;
 }
-
-/* ─── Search Bar ─────────────────────────────────────────────────── */
-.mh-search-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.hub-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+  border-color: var(--primary);
 }
+.hub-card:hover::before { transform: scaleX(1); }
+.hub-card:active { transform: scale(0.97); }
 
-.mh-search-box {
+.hub-card-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
-  background: var(--card-bg, #FFFFFF);
-  border: 1.5px solid var(--border, #E5E7EB);
-  border-radius: 14px;
-  padding: 0 6px 0 14px;
-  height: 52px;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.35rem;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+.hub-card:hover .hub-card-icon { transform: scale(1.1) rotate(-5deg); }
+
+.hub-card-body { flex: 1; }
+.hub-card-title {
+  font-size: clamp(0.95rem,1.5vw,1.05rem);
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+.hub-card-desc {
+  font-size: clamp(0.78rem,1.2vw,0.85rem);
+  color: var(--light);
+  line-height: 1.55;
+}
+
+.hub-card-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-top: 4px;
+  transition: gap 0.2s;
+}
+.hub-card:hover .hub-card-cta { gap: 10px; }
+
+[data-theme="dark"] .hub-card-title { color: var(--text-primary, #F1F5F9); }
+[data-theme="dark"] .hub-card-desc  { color: var(--text-muted, #94A3B8); }
+
+@media (max-width: 640px) {
+  .hub-cards-grid { grid-template-columns: 1fr; gap: 12px; }
+  .hub-card { padding: 16px 15px; flex-direction: row; align-items: flex-start; }
+  .hub-card-icon { width: 44px; height: 44px; font-size: 1.1rem; border-radius: 12px; flex-shrink: 0; }
+  .hub-card-body { flex: 1; min-width: 0; }
+  .hub-card::before { display: none; }
+  .hub-card:hover { transform: none; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MEDBOT PAGE (page-chat)
+   ═══════════════════════════════════════════════════════════════ */
+.medbot-page-chat-wrap {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: clamp(420px, 65vh, 680px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+}
+
+.medbot-page-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scroll-behavior: smooth;
+}
+
+.medbot-page-messages .chat-bubble {
+  display: flex;
   gap: 10px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
-  transition: border-color 0.2s, box-shadow 0.2s;
-  cursor: text;
+  align-items: flex-start;
+  max-width: 90%;
+}
+.medbot-page-messages .chat-bubble.bot { align-self: flex-start; }
+.medbot-page-messages .chat-bubble.user { align-self: flex-end; flex-direction: row-reverse; }
+.medbot-page-messages .chat-text {
+  background: var(--bg-secondary, #F3F4F6);
+  border-radius: 12px 12px 12px 3px;
+  padding: 11px 15px;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--text-primary, #111827);
+  max-width: 520px;
+}
+.medbot-page-messages .chat-bubble.user .chat-text {
+  background: var(--primary);
+  color: #fff;
+  border-radius: 12px 12px 3px 12px;
+}
+.medbot-page-messages .chat-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #06B6D4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+[data-theme="dark"] .medbot-page-messages .chat-text {
+  background: #1a2d44;
+  color: #E2E8F0;
+}
+[data-theme="dark"] .medbot-page-messages .chat-bubble.user .chat-text {
+  background: var(--primary);
+  color: #fff;
 }
 
-.mh-search-box:focus-within {
-  border-color: var(--primary, #0052CC);
-  box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.1), 0 2px 12px rgba(0, 0, 0, 0.07);
+.medbot-page-quick-replies {
+  padding: 8px 18px 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  border-top: 1px solid var(--border);
+  background: var(--card-bg);
 }
 
-[data-theme="dark"] .mh-search-box {
+.medbot-page-input-row {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: var(--card-bg);
+}
+
+.medbot-page-input {
+  flex: 1;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: var(--bg-secondary, #F9FAFB);
+  color: var(--text-primary, #111827);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.medbot-page-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0,82,204,0.1);
+}
+[data-theme="dark"] .medbot-page-input {
   background: #0F2035;
+  color: #F1F5F9;
   border-color: #2A3A4E;
 }
 
-[data-theme="dark"] .mh-search-box:focus-within {
-  border-color: #4D8FFF;
-  box-shadow: 0 0 0 3px rgba(77, 143, 255, 0.15);
-}
-
-.mh-search-icon {
-  color: var(--text-muted, #9CA3AF);
-  font-size: 1rem;
-  flex-shrink: 0;
-}
-
-.mh-search-input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  font-size: 0.92rem;
-  color: var(--text-primary, #111827);
-  font-family: inherit;
-  outline: none;
-  padding: 0;
-  min-width: 0;
-}
-
-[data-theme="dark"] .mh-search-input {
-  color: #F1F5F9;
-}
-
-.mh-search-input::placeholder {
-  color: var(--text-muted, #9CA3AF);
-  font-size: 0.88rem;
-}
-
-.mh-search-btn {
-  width: 38px;
-  height: 38px;
+.medbot-page-send-btn {
+  width: 42px;
+  height: 42px;
   border-radius: 10px;
-  background: var(--primary, #0052CC);
+  background: var(--primary);
   border: none;
   color: #fff;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   transition: background 0.2s, transform 0.15s;
-  -webkit-tap-highlight-color: transparent;
+}
+.medbot-page-send-btn:active { transform: scale(0.93); }
+
+/* Typing dots for medbot page */
+.typing-dots { display: inline-flex; gap: 4px; align-items: center; }
+.typing-dots span {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--primary, #0052CC);
+  animation: typingBounce 1.2s infinite;
+  display: inline-block;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-5px); opacity: 1; }
 }
 
-.mh-search-btn:active {
-  transform: scale(0.93);
-  background: #0041AA;
-}
-
-/* Quick tag pills */
-.mh-quick-tags {
-  display: flex;
-  gap: 7px;
-  overflow-x: auto;
-  padding-bottom: 3px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-
-.mh-quick-tags::-webkit-scrollbar {
-  display: none;
-}
-
-.mh-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: var(--card-bg, #F9FAFB);
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 20px;
-  padding: 6px 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-secondary, #374151);
-  white-space: nowrap;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.15s;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.mh-tag:active {
-  transform: scale(0.93);
-}
-
-.mh-tag:hover,
-.mh-tag:active {
-  background: rgba(0, 82, 204, 0.08);
-  border-color: var(--primary, #0052CC);
-  color: var(--primary, #0052CC);
-}
-
-[data-theme="dark"] .mh-tag {
-  background: #0F2035;
-  border-color: #2A3A4E;
-  color: #CBD5E1;
-}
-
-[data-theme="dark"] .mh-tag:hover,
-[data-theme="dark"] .mh-tag:active {
-  background: rgba(77, 143, 255, 0.12);
-  border-color: #4D8FFF;
-  color: #4D8FFF;
-}
-
-/* ─── Primary Action Cards (2×2 Grid) ───────────────────────────── */
-.mh-primary-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.mh-primary-card {
-  background: var(--card-bg, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 16px;
-  padding: 16px 14px 14px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  min-height: 130px;
-  text-align: left;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.mh-primary-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 4px;
-  border-radius: 16px 16px 0 0;
-  transition: opacity 0.2s;
-}
-
-.mh-primary-card:active {
-  transform: scale(0.96);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
-
-[data-theme="dark"] .mh-primary-card {
-  background: #0F2035;
-  border-color: #1E3246;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-}
-
-/* Card icon */
-.mh-pcard-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+/* ═══════════════════════════════════════════════════════════════
+   REPORTS PAGE
+   ═══════════════════════════════════════════════════════════════ */
+.report-card {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  color: #fff;
-  flex-shrink: 0;
-  margin-bottom: 2px;
-  transition: transform 0.2s;
-}
-
-.mh-primary-card:active .mh-pcard-icon {
-  transform: scale(0.92);
-}
-
-.mh-pcard-label {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--text-primary, #111827);
-  line-height: 1.25;
-}
-
-[data-theme="dark"] .mh-pcard-label {
-  color: #F1F5F9;
-}
-
-.mh-pcard-desc {
-  font-size: 0.72rem;
-  color: var(--text-muted, #6B7280);
-  line-height: 1.45;
-  flex: 1;
-}
-
-[data-theme="dark"] .mh-pcard-desc {
-  color: #94A3B8;
-}
-
-.mh-pcard-cta {
-  font-size: 0.72rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 2px;
-  transition: gap 0.2s;
-}
-
-.mh-primary-card:active .mh-pcard-cta {
-  gap: 7px;
-}
-
-/* Color themes for each card */
-
-/* Doctor — blue */
-.mh-card-doctor::before { background: linear-gradient(90deg, #0052CC, #0EA5E9); }
-.mh-card-doctor .mh-pcard-icon { background: linear-gradient(135deg, #0052CC, #0EA5E9); }
-.mh-card-doctor .mh-pcard-cta { color: #0052CC; }
-[data-theme="dark"] .mh-card-doctor .mh-pcard-cta { color: #4D8FFF; }
-
-/* Hospital — teal */
-.mh-card-hospital::before { background: linear-gradient(90deg, #0891B2, #14B8A6); }
-.mh-card-hospital .mh-pcard-icon { background: linear-gradient(135deg, #0891B2, #14B8A6); }
-.mh-card-hospital .mh-pcard-cta { color: #0891B2; }
-[data-theme="dark"] .mh-card-hospital .mh-pcard-cta { color: #22D3EE; }
-
-/* AI — purple */
-.mh-card-ai::before { background: linear-gradient(90deg, #7C3AED, #A855F7); }
-.mh-card-ai .mh-pcard-icon { background: linear-gradient(135deg, #7C3AED, #A855F7); }
-.mh-card-ai .mh-pcard-cta { color: #7C3AED; }
-[data-theme="dark"] .mh-card-ai .mh-pcard-cta { color: #A78BFA; }
-
-/* Appointments — orange */
-.mh-card-appts::before { background: linear-gradient(90deg, #EA580C, #F59E0B); }
-.mh-card-appts .mh-pcard-icon { background: linear-gradient(135deg, #EA580C, #F59E0B); }
-.mh-card-appts .mh-pcard-cta { color: #EA580C; }
-[data-theme="dark"] .mh-card-appts .mh-pcard-cta { color: #FB923C; }
-
-/* ─── MedBot Feature Strip ───────────────────────────────────────── */
-.mh-medbot-strip {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--card-bg, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 14px;
+  gap: 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: 14px 16px;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  position: relative;
-  overflow: hidden;
-  -webkit-tap-highlight-color: transparent;
+  margin-bottom: 10px;
+  transition: var(--transition);
 }
-
-.mh-medbot-strip::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #0052CC, #06B6D4);
-  border-radius: 14px 14px 0 0;
-}
-
-.mh-medbot-strip:active {
-  transform: scale(0.98);
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.07);
-}
-
-[data-theme="dark"] .mh-medbot-strip {
-  background: #0F2035;
-  border-color: #1E3246;
-}
-
-.mh-medbot-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #0052CC, #06B6D4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
-.mh-medbot-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.mh-medbot-title {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: var(--text-primary, #111827);
-  line-height: 1.3;
-}
-
-[data-theme="dark"] .mh-medbot-title {
-  color: #F1F5F9;
-}
-
-.mh-medbot-sub {
-  font-size: 0.72rem;
-  color: var(--text-muted, #6B7280);
-  margin-top: 2px;
-  line-height: 1.45;
-}
-
-[data-theme="dark"] .mh-medbot-sub {
-  color: #94A3B8;
-}
-
-.mh-medbot-arrow {
-  color: var(--text-muted, #9CA3AF);
-  font-size: 0.9rem;
-  flex-shrink: 0;
-  transition: transform 0.2s, color 0.2s;
-}
-
-.mh-medbot-strip:active .mh-medbot-arrow {
-  transform: translateX(4px);
-  color: var(--primary, #0052CC);
-}
-
-/* ─── Services Section ───────────────────────────────────────────── */
-.mh-services-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.mh-services-title {
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted, #6B7280);
-}
-
-[data-theme="dark"] .mh-services-title {
-  color: #64748B;
-}
-
-.mh-services-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.mh-service-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: var(--card-bg, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 12px;
-  padding: 12px 6px 10px;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--text-secondary, #374151);
-  text-align: center;
-  min-height: 72px;
-  transition: transform 0.15s, border-color 0.2s, box-shadow 0.2s;
-  -webkit-tap-highlight-color: transparent;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-}
-
-.mh-service-item:active {
-  transform: scale(0.93);
-  border-color: var(--primary, #0052CC);
-  box-shadow: 0 1px 8px rgba(0, 82, 204, 0.15);
-}
-
-[data-theme="dark"] .mh-service-item {
-  background: #0F2035;
-  border-color: #1E3246;
-  color: #CBD5E1;
-}
-
-[data-theme="dark"] .mh-service-item:active {
-  border-color: #4D8FFF;
-  box-shadow: 0 1px 8px rgba(77, 143, 255, 0.2);
-}
-
-.mh-svc-icon {
-  width: 36px;
-  height: 36px;
+.report-card:hover { border-color: var(--primary); box-shadow: var(--shadow-xl); }
+.report-icon {
+  width: 42px; height: 42px;
   border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  flex-shrink: 0;
+  background: linear-gradient(135deg, #059669, #10B981);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 1.1rem; flex-shrink: 0;
 }
-
-/* ─── Trust Strip ────────────────────────────────────────────────── */
-.mh-trust-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  background: var(--card-bg, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 14px;
-  padding: 14px 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+.report-info { flex: 1; min-width: 0; }
+.report-title { font-size: 0.9rem; font-weight: 600; color: var(--dark); }
+.report-meta { font-size: 0.78rem; color: var(--light); margin-top: 3px; }
+[data-theme="dark"] .report-title { color: var(--text-primary, #F1F5F9); }
+[data-theme="dark"] .report-meta  { color: var(--text-muted, #94A3B8); }
+.btn-icon-sm {
+  background: none; border: 1px solid var(--border); color: var(--light);
+  width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition);
 }
-
-[data-theme="dark"] .mh-trust-strip {
-  background: #0F2035;
-  border-color: #1E3246;
-}
-
-.mh-trust-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  flex: 1;
-}
-
-.mh-trust-num {
-  font-size: 1.1rem;
-  font-weight: 800;
-  background: linear-gradient(135deg, var(--primary, #0052CC), #06B6D4);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  line-height: 1.1;
-}
-
-.mh-trust-lbl {
-  font-size: 0.67rem;
-  color: var(--text-muted, #6B7280);
-  font-weight: 500;
-  text-align: center;
-  line-height: 1.3;
-}
-
-[data-theme="dark"] .mh-trust-lbl {
-  color: #94A3B8;
-}
-
-.mh-trust-div {
-  width: 1px;
-  height: 36px;
-  background: var(--border, #E5E7EB);
-  flex-shrink: 0;
-}
-
-[data-theme="dark"] .mh-trust-div {
-  background: #2A3A4E;
-}
-
-/* ─── Hide floating chatbot toggle on mobile (bottom nav replaces it) ──── */
-@media (max-width: 768px) {
-  .chatbot-toggle {
-    display: none !important;
-  }
-  /* Chat window can still be opened via JS from bottom nav items */
-}
-
-/* ─── Active indicator for bottom-nav-ai ────────────────────────── */
-.bottom-nav-item.bottom-nav-ai.active .bottom-nav-ai-pill {
-  background: linear-gradient(135deg, #0052CC, #4D8FFF);
-  box-shadow: 0 3px 12px rgba(0, 82, 204, 0.45);
-  transform: scale(1.05);
-}
-
-/* ─── Responsive Overrides ───────────────────────────────────────── */
-
-/* 360px phones — tighten slightly */
-@media (max-width: 380px) {
-  .mh-primary-grid {
-    gap: 8px;
-  }
-  .mh-primary-card {
-    padding: 13px 11px 11px;
-    min-height: 120px;
-  }
-  .mh-pcard-label {
-    font-size: 0.8rem;
-  }
-  .mh-pcard-desc {
-    font-size: 0.68rem;
-  }
-  .mh-pcard-cta {
-    font-size: 0.68rem;
-  }
-  .mh-services-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-  }
-  .mh-service-item {
-    padding: 10px 4px 8px;
-    font-size: 0.65rem;
-    min-height: 66px;
-  }
-  .mh-svc-icon {
-    width: 32px;
-    height: 32px;
-    font-size: 0.9rem;
-  }
-  .mh-trust-num {
-    font-size: 1rem;
-  }
-  .mh-trust-lbl {
-    font-size: 0.6rem;
-  }
-  .mobile-home {
-    padding: 10px 12px calc(var(--bottom-nav-height, 60px) + env(safe-area-inset-bottom, 0px) + 20px);
-    gap: 12px;
-  }
-}
-
-/* Large phones 412px+ — slightly more spacious */
-@media (min-width: 412px) and (max-width: 768px) {
-  .mh-primary-card {
-    padding: 18px 16px 15px;
-    min-height: 138px;
-  }
-  .mh-pcard-label {
-    font-size: 0.88rem;
-  }
-  .mh-pcard-desc {
-    font-size: 0.74rem;
-  }
-  .mh-svc-icon {
-    width: 38px;
-    height: 38px;
-    font-size: 1.05rem;
-  }
-  .mh-service-item {
-    font-size: 0.72rem;
-    min-height: 76px;
-    padding: 13px 8px 11px;
-  }
-  .mh-search-box {
-    height: 54px;
-  }
-}
-
-/* Extra-large phones 430px+ */
-@media (min-width: 430px) and (max-width: 768px) {
-  .mobile-home {
-    padding: 14px 16px calc(var(--bottom-nav-height, 60px) + env(safe-area-inset-bottom, 0px) + 24px);
-    gap: 16px;
-  }
-  .mh-greeting {
-    font-size: 1.45rem;
-  }
-  .mh-primary-grid {
-    gap: 12px;
-  }
-  .mh-medbot-strip {
-    padding: 16px 18px;
-  }
-}
+.btn-icon-sm:hover { background: #FEE2E2; border-color: #EF4444; color: #EF4444; }

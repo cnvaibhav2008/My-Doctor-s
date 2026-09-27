@@ -102,6 +102,8 @@ function showPage(page) {
   if (page === 'nearby') loadNearbyServices();
   if (page === 'dashboard') loadDashboard();
   if (page === 'profile') loadProfile();
+  if (page === 'reports') loadReportsPage();
+  if (page === 'chat') initMedbotPage();
 }
 
 // ─── BOTTOM NAV SYNC ──────────────────────────────────
@@ -2343,4 +2345,133 @@ function initOfflineDetection() {
 
   window.addEventListener('offline', showOfflineToast);
   window.addEventListener('online', removeOfflineToast);
+}
+
+// ─── MEDBOT PAGE (page-chat) ───────────────────────────
+const medbotPageState = {
+  sessionId: null,
+  isTyping: false,
+  history: [],
+  initialized: false
+};
+
+function initMedbotPage() {
+  const msgs = $('medbotPageMessages');
+  if (!msgs) return;
+  // Focus input
+  setTimeout(() => $('medbotPageInput')?.focus(), 300);
+}
+
+function medbotPageSend(text) {
+  const input = $('medbotPageInput');
+  const msg = (text || input?.value || '').trim();
+  if (!msg || medbotPageState.isTyping) return;
+  if (input) input.value = '';
+  _medbotPageSendMsg(msg);
+}
+
+async function _medbotPageSendMsg(msg) {
+  const msgs = $('medbotPageMessages');
+  if (!msgs) return;
+
+  // Remove quick replies row when user sends first message
+  const qr = document.querySelector('.medbot-page-quick-replies');
+  if (qr) qr.style.display = 'none';
+
+  // Append user bubble
+  medbotPageAppend('user', msg);
+  medbotPageState.history.push({ role: 'user', content: msg });
+  medbotPageState.isTyping = true;
+
+  // Typing indicator
+  const typing = document.createElement('div');
+  typing.className = 'chat-bubble bot medbot-page-typing';
+  typing.innerHTML = '<div class="chat-avatar"><i class="fas fa-robot"></i></div><div class="chat-text"><span class="typing-dots"><span></span><span></span><span></span></span></div>';
+  msgs.appendChild(typing);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  try {
+    const res = await apiCall('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        message: msg,
+        session_id: medbotPageState.sessionId,
+        history: medbotPageState.history.slice(-10)
+      })
+    });
+    typing.remove();
+    if (res.ok && res.data.success) {
+      medbotPageState.sessionId = res.data.session_id;
+      const reply = res.data.reply;
+      medbotPageState.history.push({ role: 'assistant', content: reply });
+      await new Promise(r => setTimeout(r, 120));
+      medbotPageAppend('bot', reply);
+    } else {
+      medbotPageAppend('bot', '⚠️ ' + (res.data?.error || "I'm having trouble right now. Please try again."));
+    }
+  } catch(e) {
+    typing.remove();
+    medbotPageAppend('bot', '⚠️ Network issue. Please check your connection and try again.');
+  }
+  medbotPageState.isTyping = false;
+  $('medbotPageInput')?.focus();
+}
+
+function medbotPageAppend(role, text) {
+  const msgs = $('medbotPageMessages');
+  if (!msgs) return;
+  const bubble = document.createElement('div');
+  bubble.className = `chat-bubble ${role}`;
+  const icon = role === 'bot' ? '<div class="chat-avatar"><i class="fas fa-robot"></i></div>' : '';
+  const html = formatChatMarkdown(text);
+  bubble.innerHTML = role === 'bot'
+    ? `${icon}<div class="chat-text">${html}</div>`
+    : `<div class="chat-text">${html}</div>`;
+  msgs.appendChild(bubble);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ─── REPORTS PAGE ──────────────────────────────────────
+function loadReportsPage() {
+  const gate = $('reportsAuthGate');
+  const wrap = $('reportsListWrap');
+  if (!state.user) {
+    if (gate) gate.style.display = '';
+    if (wrap) wrap.innerHTML = '';
+    return;
+  }
+  if (gate) gate.style.display = 'none';
+  if (wrap) wrap.innerHTML = '<div class="loading-state" style="padding:40px 20px"><div class="spinner"></div><p>Loading records...</p></div>';
+  loadReports();
+}
+
+async function loadReports() {
+  const wrap = $('reportsListWrap');
+  if (!wrap) return;
+  try {
+    const res = await apiCall('/api/reports');
+    if (!res.ok) { wrap.innerHTML = '<div class="empty-state"><i class="fas fa-file-medical-alt"></i><h3>Could not load records</h3></div>'; return; }
+    const reports = res.data.reports || [];
+    if (!reports.length) {
+      wrap.innerHTML = `<div class="empty-state"><i class="fas fa-file-medical-alt"></i><h3>No Records Yet</h3><p>Your uploaded prescriptions and lab reports will appear here.</p></div>`;
+      return;
+    }
+    wrap.innerHTML = reports.map(r => `
+      <div class="report-card">
+        <div class="report-icon"><i class="fas fa-file-medical"></i></div>
+        <div class="report-info">
+          <div class="report-title">${r.title || 'Medical Record'}</div>
+          <div class="report-meta">${r.type || 'Document'} &bull; ${r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN') : ''}</div>
+        </div>
+        <button class="btn-icon-sm" onclick="deleteReport(${r.id})" title="Delete"><i class="fas fa-trash-alt"></i></button>
+      </div>`).join('');
+  } catch(e) {
+    wrap.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Error loading records</h3></div>';
+  }
+}
+
+async function deleteReport(id) {
+  if (!confirm('Delete this record?')) return;
+  await apiCall(`/api/reports/${id}`, { method: 'DELETE' });
+  loadReports();
 }
