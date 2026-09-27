@@ -6,8 +6,7 @@
 ---
 
 ## 🌐 Live URL
-**Sandbox**: https://3000-i34vcpfsnfv6yey4pxffq-5c13a017.sandbox.novita.ai
-
+https://78d60d97.mydoctors-aaz.pages.dev/#
 ---
 
 ## ✅ Completed Features
