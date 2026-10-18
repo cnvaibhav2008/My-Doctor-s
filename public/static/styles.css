@@ -2469,3 +2469,770 @@ button:focus-visible, a:focus-visible {
   transition: var(--transition);
 }
 .btn-icon-sm:hover { background: #FEE2E2; border-color: #EF4444; color: #EF4444; }
+
+/* ═══════════════════════════════════════════════════════════════
+   MY PROFILE PAGE — .mp-* COMPONENT STYLES
+   ═══════════════════════════════════════════════════════════════ */
+
+.my-profile-page {
+  padding: 16px 0 20px;
+}
+
+/* ── Profile Header Card ──────────────────────────────────── */
+.mp-header-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, var(--navy, #0A1628), var(--dark-2, #232D3F));
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.mp-header-card::before {
+  content: '';
+  position: absolute;
+  top: -30px; right: -30px;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: rgba(0,102,255,0.12);
+}
+
+.mp-avatar {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #4D8FFF);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+  border: 3px solid rgba(255,255,255,0.2);
+  overflow: hidden;
+}
+.mp-avatar img {
+  width: 100%; height: 100%; object-fit: cover;
+  border-radius: 50%;
+}
+
+.mp-header-info {
+  flex: 1; min-width: 0;
+}
+.mp-name {
+  font-size: 1.1rem; font-weight: 700;
+  color: #fff; margin: 0 0 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mp-type, .mp-blood, .mp-city {
+  font-size: 0.78rem; color: rgba(255,255,255,0.7);
+  display: flex; align-items: center; gap: 5px;
+  margin-top: 2px;
+}
+.mp-type i, .mp-blood i, .mp-city i { font-size: 0.75rem; }
+
+.mp-edit-btn {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff; border-radius: 10px;
+  padding: 7px 12px; font-size: 0.78rem;
+  font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; gap: 5px;
+  transition: background 0.2s;
+  white-space: nowrap; flex-shrink: 0;
+}
+.mp-edit-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* ── Stats Strip ──────────────────────────────────────────── */
+.mp-stats-strip {
+  display: flex;
+  gap: 0;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.mp-stat {
+  flex: 1;
+  text-align: center;
+  padding: 14px 8px;
+  border-right: 1px solid var(--border);
+}
+.mp-stat:last-child { border-right: none; }
+.mp-stat-num {
+  font-size: 1.5rem; font-weight: 800;
+  color: var(--primary); line-height: 1;
+  margin-bottom: 3px;
+}
+.mp-stat-label {
+  font-size: 0.72rem; color: var(--light);
+  font-weight: 500;
+}
+
+/* ── Section Tabs ─────────────────────────────────────────── */
+.mp-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+  margin-bottom: 14px;
+}
+.mp-tabs::-webkit-scrollbar { display: none; }
+
+.mp-tab {
+  display: flex; align-items: center; gap: 5px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--card-bg);
+  color: var(--mid);
+  font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+  transition: all 0.2s;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+.mp-tab i { font-size: 0.78rem; }
+.mp-tab:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.mp-tab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* ── Panel (tab content) ──────────────────────────────────── */
+.mp-panel { animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Section Card ─────────────────────────────────────────── */
+.mp-section-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  margin-bottom: 14px;
+}
+.mp-section-card h4 {
+  font-size: 0.9rem; font-weight: 700;
+  color: var(--dark); margin: 0 0 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.mp-section-card h4 i { color: var(--primary); font-size: 0.85rem; }
+
+/* ── Info Grid (key-value pairs) ──────────────────────────── */
+.mp-info-grid { display: flex; flex-direction: column; gap: 0; }
+.mp-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.mp-info-row:last-child { border-bottom: none; padding-bottom: 0; }
+.mp-info-label {
+  font-size: 0.78rem; color: var(--light);
+  font-weight: 500; flex-shrink: 0;
+  min-width: 100px;
+}
+.mp-info-val {
+  font-size: 0.82rem; color: var(--dark);
+  font-weight: 600; text-align: right;
+  word-break: break-word;
+}
+.mp-info-val a { color: var(--primary); text-decoration: none; }
+[data-theme="dark"] .mp-info-val { color: var(--text-primary); }
+[data-theme="dark"] .mp-section-card h4 { color: var(--text-primary); }
+
+/* ── Tags (medical history, allergies, medications) ───────── */
+.mp-tags {
+  display: flex; flex-wrap: wrap; gap: 7px;
+  margin-bottom: 6px;
+}
+.mp-tag {
+  padding: 4px 11px;
+  border-radius: 20px;
+  font-size: 0.78rem; font-weight: 600;
+  background: var(--primary-light, #E8F0FE);
+  color: var(--primary);
+  border: 1px solid rgba(0,102,255,0.15);
+}
+.mp-tag.allergy {
+  background: #FEE2E2; color: #EF4444;
+  border-color: rgba(239,68,68,0.2);
+}
+.mp-tag.med {
+  background: #ECFDF5; color: #059669;
+  border-color: rgba(5,150,105,0.2);
+}
+
+/* ── Action Buttons ───────────────────────────────────────── */
+.mp-action-btn {
+  display: flex; align-items: center; justify-content: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 11px 16px;
+  border-radius: var(--radius-md);
+  background: var(--primary-light, #E8F0FE);
+  color: var(--primary);
+  border: 1.5px solid rgba(0,102,255,0.2);
+  font-size: 0.85rem; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+  font-family: inherit;
+}
+.mp-action-btn:hover {
+  background: var(--primary);
+  color: #fff; border-color: var(--primary);
+}
+.mp-action-btn.danger {
+  background: #FEE2E2; color: #EF4444;
+  border-color: rgba(239,68,68,0.25);
+}
+.mp-action-btn.danger:hover {
+  background: #EF4444; color: #fff;
+  border-color: #EF4444;
+}
+
+/* ── Appointment Row ──────────────────────────────────────── */
+.mp-appt-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.mp-appt-row:last-child { border-bottom: none; }
+.mp-appt-avatar {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #4D8FFF);
+  color: #fff; font-size: 0.85rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.mp-appt-info { flex: 1; min-width: 0; }
+.mp-appt-name {
+  font-size: 0.88rem; font-weight: 700;
+  color: var(--dark); margin-bottom: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mp-appt-spec {
+  font-size: 0.75rem; color: var(--primary);
+  font-weight: 500; margin-bottom: 2px;
+}
+.mp-appt-date {
+  font-size: 0.74rem; color: var(--light);
+  display: flex; align-items: center; gap: 4px;
+}
+[data-theme="dark"] .mp-appt-name { color: var(--text-primary); }
+
+/* ── Record Row ───────────────────────────────────────────── */
+.mp-record-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.mp-record-row:last-child { border-bottom: none; }
+.mp-record-icon {
+  font-size: 1.25rem; color: var(--primary); flex-shrink: 0;
+}
+.mp-record-info { flex: 1; min-width: 0; }
+.mp-record-title {
+  font-size: 0.85rem; font-weight: 600;
+  color: var(--dark); margin-bottom: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mp-record-meta { font-size: 0.74rem; color: var(--light); }
+[data-theme="dark"] .mp-record-title { color: var(--text-primary); }
+.mp-btn-view {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: var(--primary-light, #E8F0FE);
+  color: var(--primary); border: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; cursor: pointer;
+  text-decoration: none; flex-shrink: 0;
+  transition: background 0.2s;
+}
+.mp-btn-view:hover { background: var(--primary); color: #fff; }
+
+/* ── Settings List ────────────────────────────────────────── */
+.mp-settings-list {
+  display: flex; flex-direction: column; gap: 0;
+}
+.mp-setting-row {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border-light);
+  background: none; border-left: none; border-right: none; border-top: none;
+  cursor: pointer; font-family: inherit;
+  font-size: 0.85rem; font-weight: 600;
+  color: var(--dark);
+  transition: color 0.15s;
+  text-align: left;
+}
+.mp-setting-row:last-child { border-bottom: none; }
+.mp-setting-row span {
+  display: flex; align-items: center; gap: 10px;
+}
+.mp-setting-row span i { color: var(--primary); font-size: 0.9rem; width: 16px; }
+.mp-setting-row > i.fa-chevron-right {
+  color: var(--lighter); font-size: 0.75rem;
+}
+.mp-setting-row:hover { color: var(--primary); }
+[data-theme="dark"] .mp-setting-row { color: var(--text-primary); }
+
+/* ── Empty state ──────────────────────────────────────────── */
+.mp-empty {
+  font-size: 0.83rem; color: var(--light);
+  font-style: italic; padding: 6px 0;
+  margin: 0;
+}
+
+/* ── Auth-required card ───────────────────────────────────── */
+.auth-required-card {
+  display: flex; flex-direction: column;
+  align-items: center; text-align: center;
+  padding: 48px 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin: 16px 0;
+}
+.auth-required-card h3 {
+  font-size: 1.1rem; font-weight: 700;
+  color: var(--dark); margin: 0 0 8px;
+}
+.auth-required-card p {
+  font-size: 0.85rem; color: var(--light);
+  margin: 0 0 20px; max-width: 280px;
+}
+[data-theme="dark"] .auth-required-card h3 { color: var(--text-primary); }
+
+/* ── Profile header background ────────────────────────────── */
+.profile-header {
+  background: linear-gradient(135deg, #0A1628 0%, #0052CC 60%, #00C9A7 100%) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AI DISCLAIMER NOTE (new prominent style)
+   ═══════════════════════════════════════════════════════════════ */
+.ai-disclaimer-note {
+  background: linear-gradient(135deg, #FFF8E1, #FEF3C7);
+  border: 1.5px solid #F59E0B;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.8rem;
+  color: #92400E;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+.ai-disclaimer-note i {
+  color: #F59E0B;
+  margin-top: 1px;
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+.ai-disclaimer-note em { font-style: italic; font-weight: 600; }
+[data-theme="dark"] .ai-disclaimer-note {
+  background: rgba(245,158,11,0.08);
+  border-color: rgba(245,158,11,0.35);
+  color: #FCD34D;
+}
+[data-theme="dark"] .ai-disclaimer-note i { color: #FCD34D; }
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE DOCTOR CARDS — MOBILE FIXES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Doctor list card: prevent horizontal overflow on small screens */
+@media (max-width: 480px) {
+  .doctors-list .doctor-list-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .doctor-list-card > *:first-child {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .doctor-list-actions {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    border-top: 1px solid var(--border-light);
+    padding-top: 10px;
+  }
+
+  .doctor-list-fee .fee-amount { font-size: 1.05rem; }
+
+  /* Prevent long names from breaking layout */
+  .doctor-list-info h3 {
+    white-space: normal;
+    font-size: 0.9rem;
+    line-height: 1.3;
+  }
+  .doctor-list-info { flex: 1; min-width: 0; }
+
+  /* Meta items: wrap cleanly */
+  .doctor-list-meta { gap: 8px; }
+  .doctor-list-meta-item { font-size: 0.72rem; }
+
+  /* Action buttons side by side on small screens */
+  .btn-book-appt, .btn-view-profile {
+    font-size: 0.78rem;
+    padding: 9px 12px;
+  }
+}
+
+/* Touch-friendly doctor cards — larger tap targets on mobile */
+@media (max-width: 768px) {
+  .doctor-list-card {
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-book-appt, .btn-view-profile {
+    min-height: 40px;
+  }
+
+  /* Fix spec-cards horizontal overflow in specialty grid */
+  .specializations-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 10px;
+  }
+  .spec-card {
+    padding: 12px 8px;
+  }
+  .spec-name {
+    font-size: 0.72rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BODY DIAGRAM — TOUCH & MOBILE IMPROVEMENTS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Larger touch targets for SVG body parts */
+.body-part {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Make the SVG bigger on mobile so parts are easier to tap */
+@media (max-width: 768px) {
+  .body-svg {
+    width: min(220px, 85%) !important;
+  }
+  .body-diagram-container {
+    padding: 8px 0;
+  }
+  /* Body view toggle buttons */
+  .body-view-toggle {
+    margin-bottom: 10px;
+  }
+  .body-view-btn {
+    padding: 7px 16px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Body view toggle strip */
+.body-view-toggle {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.body-view-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--card-bg);
+  color: var(--mid);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.body-view-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* Selected part zoom badge — improved */
+.selected-part-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-top: 10px;
+  box-shadow: 0 3px 12px rgba(0,102,255,0.3);
+  animation: slideUpBadge 0.2s ease;
+}
+@keyframes slideUpBadge {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.selected-part-badge i { font-size: 0.8rem; }
+.selected-part-badge button {
+  background: rgba(255,255,255,0.25);
+  border: none; color: #fff;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  cursor: pointer; font-size: 0.7rem;
+  display: flex; align-items: center; justify-content: center;
+  margin-left: 2px;
+}
+
+/* Body part hover pulse animation */
+.body-part:hover {
+  animation: bodyPulse 0.3s ease;
+}
+@keyframes bodyPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+/* Zoom region overlay (shown on second tap) */
+.body-zoom-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+}
+.body-zoom-card {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  max-width: 340px;
+  width: calc(100% - 32px);
+  text-align: center;
+  position: relative;
+  box-shadow: var(--shadow-xl);
+  animation: zoomIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes zoomIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.body-zoom-card h3 {
+  font-size: 1rem; font-weight: 700;
+  color: var(--dark); margin: 0 0 8px;
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+}
+.body-zoom-card p {
+  font-size: 0.82rem; color: var(--light);
+  margin: 0 0 16px; line-height: 1.5;
+}
+.body-zoom-close {
+  position: absolute; top: 12px; right: 12px;
+  width: 28px; height: 28px;
+  border-radius: 50%; border: none;
+  background: var(--border); color: var(--mid);
+  cursor: pointer; font-size: 0.75rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.body-zoom-region-svg {
+  width: 120px; height: 120px;
+  margin: 0 auto 12px;
+}
+.body-zoom-symptom-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: #fff; border: none;
+  font-size: 0.85rem; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; justify-content: center;
+  gap: 7px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GLOBAL RESPONSIVE / ZOOM FIXES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Prevent horizontal overflow across all pages */
+body, .page, .container {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Touch manipulation on interactive elements — prevent 300ms delay */
+button, a, input, select, textarea,
+.doctor-list-card, .spec-card, .hub-card,
+.appointment-card, .body-part {
+  touch-action: manipulation;
+}
+
+/* Smooth scroll momentum on iOS */
+.page, .modal-box, .mp-tabs {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Form inputs: prevent iOS auto-zoom on focus (font-size >= 16px) */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+input[type="search"],
+select,
+textarea {
+  font-size: max(16px, 1rem) !important;
+}
+
+/* On desktop allow smaller inputs back */
+@media (min-width: 769px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: inherit !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MY PROFILE PAGE — RESPONSIVE
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 480px) {
+  .mp-header-card {
+    padding: 16px;
+    gap: 12px;
+  }
+  .mp-name { font-size: 1rem; }
+  .mp-avatar { width: 54px; height: 54px; font-size: 1.15rem; }
+  .mp-stat-num { font-size: 1.25rem; }
+  .mp-tabs { gap: 5px; }
+  .mp-tab {
+    padding: 7px 11px;
+    font-size: 0.74rem;
+  }
+  .mp-tab i { display: none; }
+  .mp-section-card { padding: 14px; }
+  .mp-info-label { min-width: 80px; font-size: 0.74rem; }
+  .mp-info-val { font-size: 0.78rem; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DARK MODE PATCHES FOR NEW COMPONENTS
+   ═══════════════════════════════════════════════════════════════ */
+
+[data-theme="dark"] .mp-header-card {
+  background: linear-gradient(135deg, #040D1A, #0D1B2E);
+}
+[data-theme="dark"] .mp-stats-strip {
+  background: var(--card-bg);
+  border-color: var(--border);
+}
+[data-theme="dark"] .mp-info-label { color: var(--text-muted); }
+[data-theme="dark"] .mp-tag {
+  background: rgba(0,102,255,0.15);
+  border-color: rgba(77,143,255,0.2);
+  color: #4D8FFF;
+}
+[data-theme="dark"] .mp-tag.allergy {
+  background: rgba(239,68,68,0.12);
+  border-color: rgba(239,68,68,0.2);
+  color: #FC8181;
+}
+[data-theme="dark"] .mp-tag.med {
+  background: rgba(5,150,105,0.12);
+  border-color: rgba(5,150,105,0.2);
+  color: #34D399;
+}
+[data-theme="dark"] .mp-action-btn {
+  background: rgba(0,102,255,0.15);
+  border-color: rgba(77,143,255,0.2);
+  color: #4D8FFF;
+}
+[data-theme="dark"] .mp-action-btn.danger {
+  background: rgba(239,68,68,0.12);
+  border-color: rgba(239,68,68,0.2);
+  color: #FC8181;
+}
+[data-theme="dark"] .mp-setting-row { border-color: var(--border); }
+[data-theme="dark"] .mp-btn-view {
+  background: rgba(0,102,255,0.15);
+  color: #4D8FFF;
+}
+[data-theme="dark"] .auth-required-card {
+  background: var(--card-bg);
+  border-color: var(--border);
+}
+[data-theme="dark"] .body-zoom-card {
+  background: var(--card-bg);
+}
+[data-theme="dark"] .body-zoom-card h3 { color: var(--text-primary); }
+[data-theme="dark"] .body-zoom-close { background: var(--surface); color: var(--text-muted); }
+
+/* ═══════════════════════════════════════════════════════════════
+   DOCTOR CARD TOUCH IMPROVEMENTS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Larger tap targets for hd-doc action buttons */
+.btn-hd-view, .btn-hd-book {
+  min-height: 40px;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Prevent card transform hover on touch devices (no hover state) */
+@media (hover: none) {
+  .hd-doc-card:hover { transform: none; }
+  .doctor-card:hover { transform: none; }
+}
+
+/* Bottom nav span labels — prevent overflow at very small widths */
+.bottom-nav-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 56px;
+  display: block;
+  font-size: clamp(0.56rem, 1.7vw, 0.65rem);
+}
+
+/* Ensure specializations grid doesn't overflow on narrow screens */
+@media (max-width: 360px) {
+  .specializations-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .mp-tabs {
+    gap: 4px;
+  }
+  .mp-tab {
+    padding: 6px 9px;
+    font-size: 0.7rem;
+  }
+}

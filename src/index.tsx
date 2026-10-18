@@ -1648,7 +1648,7 @@ app.get('*', (c) => {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
 <title>MyDoctor's - Find the Right Doctor Near You</title>
 <meta name="description" content="Find and book the best doctors near you. AI-powered disease prediction, symptom checker, nearby hospitals and medical services.">
 
@@ -1911,15 +1911,15 @@ app.get('*', (c) => {
           <div class="hub-card-cta">Check Now <i class="fas fa-arrow-right"></i></div>
         </div>
 
-        <div class="hub-card" onclick="showPage('chat'); setBottomNav('bnChat')">
+        <div class="hub-card" onclick="showPage('myProfile'); setBottomNav('bnProfile')">
           <div class="hub-card-icon" style="background:linear-gradient(135deg,#0052CC,#06B6D4)">
-            <i class="fas fa-comment-medical"></i>
+            <i class="fas fa-user-circle"></i>
           </div>
           <div class="hub-card-body">
-            <div class="hub-card-title">MedBot Chat</div>
-            <div class="hub-card-desc">Ask any health, medicine, or wellness question to our intelligent AI assistant</div>
+            <div class="hub-card-title">My Profile</div>
+            <div class="hub-card-desc">View your health info, appointments, records and account settings in one place</div>
           </div>
-          <div class="hub-card-cta">Ask MedBot <i class="fas fa-arrow-right"></i></div>
+          <div class="hub-card-cta">View Profile <i class="fas fa-arrow-right"></i></div>
         </div>
 
         <div class="hub-card" onclick="showPage('appointments'); setBottomNav('bnAppts')">
@@ -1983,7 +1983,7 @@ app.get('*', (c) => {
           <div class="spec-count">Brain &amp; Spine</div>
         </div>
         <div class="spec-card" onclick="filterBySpec('Nephrology')">
-          <div class="spec-icon" style="background:linear-gradient(135deg,#81ecec,#00cec9)"><i class="fas fa-kidneys"></i></div>
+          <div class="spec-icon" style="background:linear-gradient(135deg,#81ecec,#00cec9)"><i class="fas fa-filter"></i></div>
           <div class="spec-name">Nephrology</div>
           <div class="spec-count">Kidney &amp; Transplant</div>
         </div>
@@ -2174,69 +2174,168 @@ app.get('*', (c) => {
       <!-- LEFT: Body Diagram -->
       <div class="body-diagram-panel">
         <h3><i class="fas fa-male"></i> Select Affected Body Part</h3>
-        <p class="diagram-hint">Click on the body part to add location context</p>
+        <p class="diagram-hint">Tap a body region to add location context · Tap again to zoom</p>
+
+        <!-- Front / Back view toggle -->
+        <div class="body-view-toggle">
+          <button class="body-view-btn active" id="bvFront" onclick="switchBodyView('front')">
+            <i class="fas fa-male"></i> Front
+          </button>
+          <button class="body-view-btn" id="bvBack" onclick="switchBodyView('back')">
+            <i class="fas fa-male fa-flip-horizontal"></i> Back
+          </button>
+        </div>
+
         <div class="body-diagram-container">
-          <svg id="bodyDiagram" viewBox="0 0 200 420" xmlns="http://www.w3.org/2000/svg" class="body-svg">
+          <!-- FRONT VIEW -->
+          <svg id="bodyDiagramFront" viewBox="0 0 200 440" xmlns="http://www.w3.org/2000/svg" class="body-svg">
             <!-- Head -->
             <g class="body-part" id="bp-head" onclick="selectBodyPart('head','Head')" title="Head">
-              <ellipse cx="100" cy="40" rx="28" ry="35" fill="#e8d5c4" stroke="#c9a87a" stroke-width="2"/>
-              <circle cx="88" cy="35" r="4" fill="#5d4037" opacity="0.7"/>
-              <circle cx="112" cy="35" r="4" fill="#5d4037" opacity="0.7"/>
-              <path d="M88 50 Q100 58 112 50" stroke="#c9a87a" stroke-width="1.5" fill="none"/>
-              <text x="100" y="90" text-anchor="middle" class="body-label">Head</text>
+              <ellipse cx="100" cy="38" rx="28" ry="34" fill="#e8d5c4" stroke="#c9a87a" stroke-width="2"/>
+              <circle cx="88" cy="33" r="4" fill="#5d4037" opacity="0.7"/>
+              <circle cx="112" cy="33" r="4" fill="#5d4037" opacity="0.7"/>
+              <path d="M88 48 Q100 56 112 48" stroke="#c9a87a" stroke-width="1.5" fill="none"/>
+              <text x="100" y="87" text-anchor="middle" class="body-label">Head</text>
             </g>
             <!-- Neck -->
-            <g class="body-part" id="bp-neck" onclick="selectBodyPart('neck','Neck/Throat')" title="Neck">
-              <rect x="88" y="72" width="24" height="20" rx="5" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
-              <text x="100" y="105" text-anchor="middle" class="body-label">Neck</text>
+            <g class="body-part" id="bp-neck" onclick="selectBodyPart('neck','Neck/Throat')" title="Neck/Throat">
+              <rect x="88" y="70" width="24" height="18" rx="5" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <text x="100" y="103" text-anchor="middle" class="body-label">Neck</text>
             </g>
-            <!-- Chest -->
+            <!-- Chest (with heart/lung hint lines) -->
             <g class="body-part" id="bp-chest" onclick="selectBodyPart('chest','Chest')" title="Chest">
-              <rect x="68" y="92" width="64" height="70" rx="10" fill="#e8d5c4" stroke="#c9a87a" stroke-width="2"/>
-              <line x1="100" y1="95" x2="100" y2="158" stroke="#c9a87a" stroke-width="1" stroke-dasharray="3,2"/>
-              <path d="M78 108 Q88 104 100 108 Q112 104 122 108" stroke="#c9a87a" stroke-width="1.5" fill="none"/>
-              <text x="100" y="175" text-anchor="middle" class="body-label">Chest</text>
+              <rect x="68" y="88" width="64" height="68" rx="10" fill="#e8d5c4" stroke="#c9a87a" stroke-width="2"/>
+              <line x1="100" y1="91" x2="100" y2="153" stroke="#c9a87a" stroke-width="0.8" stroke-dasharray="3,2" opacity="0.6"/>
+              <!-- Rib hints -->
+              <path d="M78 104 Q88 100 100 104 Q112 100 122 104" stroke="#c9a87a" stroke-width="1" fill="none" opacity="0.6"/>
+              <path d="M76 117 Q88 113 100 117 Q112 113 124 117" stroke="#c9a87a" stroke-width="1" fill="none" opacity="0.5"/>
+              <path d="M76 130 Q88 126 100 130 Q112 126 124 130" stroke="#c9a87a" stroke-width="1" fill="none" opacity="0.4"/>
+              <text x="100" y="171" text-anchor="middle" class="body-label">Chest</text>
+            </g>
+            <!-- Left Shoulder -->
+            <g class="body-part" id="bp-left-shoulder" onclick="selectBodyPart('shoulder','Left Shoulder')" title="Left Shoulder">
+              <ellipse cx="55" cy="94" rx="14" ry="11" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <text x="42" y="115" text-anchor="middle" class="body-label" style="font-size:7px">L.Shoulder</text>
+            </g>
+            <!-- Right Shoulder -->
+            <g class="body-part" id="bp-right-shoulder" onclick="selectBodyPart('shoulder','Right Shoulder')" title="Right Shoulder">
+              <ellipse cx="145" cy="94" rx="14" ry="11" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <text x="158" y="115" text-anchor="middle" class="body-label" style="font-size:7px">R.Shoulder</text>
             </g>
             <!-- Abdomen -->
             <g class="body-part" id="bp-abdomen" onclick="selectBodyPart('abdomen','Abdomen')" title="Abdomen">
-              <rect x="72" y="162" width="56" height="55" rx="8" fill="#e8d5c4" stroke="#c9a87a" stroke-width="2"/>
-              <ellipse cx="100" cy="185" rx="5" ry="7" fill="none" stroke="#c9a87a" stroke-width="1"/>
-              <text x="100" y="232" text-anchor="middle" class="body-label">Abdomen</text>
+              <rect x="72" y="156" width="56" height="52" rx="8" fill="#e8d5c4" stroke="#c9a87a" stroke-width="2"/>
+              <ellipse cx="100" cy="178" rx="5" ry="7" fill="none" stroke="#c9a87a" stroke-width="1"/>
+              <text x="100" y="223" text-anchor="middle" class="body-label">Abdomen</text>
             </g>
             <!-- Left Arm -->
             <g class="body-part" id="bp-left-arm" onclick="selectBodyPart('arm','Left Arm')" title="Left Arm">
-              <rect x="28" y="92" width="38" height="90" rx="15" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
-              <rect x="20" y="182" width="38" height="55" rx="12" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
-              <text x="39" y="255" text-anchor="middle" class="body-label">L.Arm</text>
+              <rect x="26" y="100" width="28" height="80" rx="12" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="20" y="180" width="28" height="52" rx="10" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="16" y="228" width="36" height="14" rx="6" fill="#c9a87a" stroke="#a07855" stroke-width="1"/>
+              <text x="34" y="252" text-anchor="middle" class="body-label">L.Arm</text>
             </g>
             <!-- Right Arm -->
             <g class="body-part" id="bp-right-arm" onclick="selectBodyPart('arm','Right Arm')" title="Right Arm">
-              <rect x="134" y="92" width="38" height="90" rx="15" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
-              <rect x="142" y="182" width="38" height="55" rx="12" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
-              <text x="161" y="255" text-anchor="middle" class="body-label">R.Arm</text>
+              <rect x="146" y="100" width="28" height="80" rx="12" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="152" y="180" width="28" height="52" rx="10" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="148" y="228" width="36" height="14" rx="6" fill="#c9a87a" stroke="#a07855" stroke-width="1"/>
+              <text x="166" y="252" text-anchor="middle" class="body-label">R.Arm</text>
             </g>
-            <!-- Pelvic -->
-            <g class="body-part" id="bp-pelvis" onclick="selectBodyPart('pelvis','Pelvic Region')" title="Pelvis">
-              <rect x="70" y="217" width="60" height="35" rx="8" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
-              <text x="100" y="264" text-anchor="middle" class="body-label">Pelvis</text>
+            <!-- Pelvis/Hips -->
+            <g class="body-part" id="bp-pelvis" onclick="selectBodyPart('pelvis','Pelvic/Hip Region')" title="Pelvis">
+              <rect x="70" y="208" width="60" height="32" rx="8" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <text x="100" y="254" text-anchor="middle" class="body-label">Pelvis</text>
             </g>
-            <!-- Left Leg -->
+            <!-- Left Leg (thigh + shin + foot) -->
             <g class="body-part" id="bp-left-leg" onclick="selectBodyPart('leg','Left Leg')" title="Left Leg">
-              <rect x="68" y="252" width="28" height="90" rx="12" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
-              <rect x="62" y="342" width="28" height="60" rx="10" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
-              <rect x="55" y="398" width="38" height="18" rx="8" fill="#c9a87a" stroke="#a07855" stroke-width="1"/>
-              <text x="76" y="430" text-anchor="middle" class="body-label">L.Leg</text>
+              <rect x="70" y="240" width="26" height="84" rx="10" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="66" y="324" width="26" height="56" rx="9" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="58" y="376" width="36" height="16" rx="7" fill="#c9a87a" stroke="#a07855" stroke-width="1"/>
+              <text x="79" y="405" text-anchor="middle" class="body-label">L.Leg</text>
             </g>
             <!-- Right Leg -->
             <g class="body-part" id="bp-right-leg" onclick="selectBodyPart('leg','Right Leg')" title="Right Leg">
-              <rect x="104" y="252" width="28" height="90" rx="12" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
-              <rect x="110" y="342" width="28" height="60" rx="10" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
-              <rect x="107" y="398" width="38" height="18" rx="8" fill="#c9a87a" stroke="#a07855" stroke-width="1"/>
-              <text x="118" y="430" text-anchor="middle" class="body-label">R.Leg</text>
+              <rect x="104" y="240" width="26" height="84" rx="10" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="108" y="324" width="26" height="56" rx="9" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="106" y="376" width="36" height="16" rx="7" fill="#c9a87a" stroke="#a07855" stroke-width="1"/>
+              <text x="121" y="405" text-anchor="middle" class="body-label">R.Leg</text>
             </g>
-            <!-- Back indicator -->
-            <text x="5" y="130" class="body-label small-label" style="font-size:8px;fill:#999">◄Back</text>
           </svg>
+
+          <!-- BACK VIEW (hidden by default) -->
+          <svg id="bodyDiagramBack" viewBox="0 0 200 440" xmlns="http://www.w3.org/2000/svg" class="body-svg" style="display:none">
+            <!-- Head (back) -->
+            <g class="body-part" id="bpb-head" onclick="selectBodyPart('head','Head (Back)')" title="Head">
+              <ellipse cx="100" cy="38" rx="28" ry="34" fill="#e8d5c4" stroke="#c9a87a" stroke-width="2"/>
+              <path d="M80 30 Q100 24 120 30" stroke="#c9a87a" stroke-width="1.5" fill="none"/>
+              <text x="100" y="87" text-anchor="middle" class="body-label">Head</text>
+            </g>
+            <!-- Neck (back) -->
+            <g class="body-part" id="bpb-neck" onclick="selectBodyPart('neck','Neck (Back)')" title="Neck/Cervical">
+              <rect x="88" y="70" width="24" height="18" rx="5" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <text x="100" y="103" text-anchor="middle" class="body-label">Neck</text>
+            </g>
+            <!-- Upper Back / Shoulders -->
+            <g class="body-part" id="bpb-upper-back" onclick="selectBodyPart('upper-back','Upper Back')" title="Upper Back">
+              <rect x="68" y="88" width="64" height="50" rx="10" fill="#e8d5c4" stroke="#c9a87a" stroke-width="2"/>
+              <line x1="100" y1="91" x2="100" y2="135" stroke="#c9a87a" stroke-width="0.8" stroke-dasharray="3,2" opacity="0.6"/>
+              <path d="M70 100 Q85 96 100 100 Q115 96 130 100" stroke="#c9a87a" stroke-width="1" fill="none" opacity="0.6"/>
+              <path d="M70 112 Q85 108 100 112 Q115 108 130 112" stroke="#c9a87a" stroke-width="1" fill="none" opacity="0.5"/>
+              <text x="100" y="153" text-anchor="middle" class="body-label">Upper Back</text>
+            </g>
+            <!-- Left Shoulder (back) -->
+            <g class="body-part" id="bpb-left-shoulder" onclick="selectBodyPart('shoulder','Left Shoulder')" title="Left Shoulder">
+              <ellipse cx="55" cy="94" rx="14" ry="11" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <text x="42" y="115" text-anchor="middle" class="body-label" style="font-size:7px">L.Shoulder</text>
+            </g>
+            <!-- Right Shoulder (back) -->
+            <g class="body-part" id="bpb-right-shoulder" onclick="selectBodyPart('shoulder','Right Shoulder')" title="Right Shoulder">
+              <ellipse cx="145" cy="94" rx="14" ry="11" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <text x="158" y="115" text-anchor="middle" class="body-label" style="font-size:7px">R.Shoulder</text>
+            </g>
+            <!-- Lower Back -->
+            <g class="body-part" id="bpb-lower-back" onclick="selectBodyPart('lower-back','Lower Back')" title="Lower Back">
+              <rect x="72" y="138" width="56" height="50" rx="8" fill="#e8d5c4" stroke="#c9a87a" stroke-width="2"/>
+              <line x1="100" y1="141" x2="100" y2="185" stroke="#c9a87a" stroke-width="0.8" stroke-dasharray="3,2" opacity="0.6"/>
+              <text x="100" y="203" text-anchor="middle" class="body-label">Lower Back</text>
+            </g>
+            <!-- Left Arm (back) -->
+            <g class="body-part" id="bpb-left-arm" onclick="selectBodyPart('arm','Left Arm')" title="Left Arm">
+              <rect x="26" y="100" width="28" height="80" rx="12" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="20" y="180" width="28" height="52" rx="10" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="16" y="228" width="36" height="14" rx="6" fill="#c9a87a" stroke="#a07855" stroke-width="1"/>
+              <text x="34" y="252" text-anchor="middle" class="body-label">L.Arm</text>
+            </g>
+            <!-- Right Arm (back) -->
+            <g class="body-part" id="bpb-right-arm" onclick="selectBodyPart('arm','Right Arm')" title="Right Arm">
+              <rect x="146" y="100" width="28" height="80" rx="12" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="152" y="180" width="28" height="52" rx="10" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="148" y="228" width="36" height="14" rx="6" fill="#c9a87a" stroke="#a07855" stroke-width="1"/>
+              <text x="166" y="252" text-anchor="middle" class="body-label">R.Arm</text>
+            </g>
+            <!-- Buttocks -->
+            <g class="body-part" id="bpb-pelvis" onclick="selectBodyPart('pelvis','Buttocks/Hips')" title="Buttocks/Hips">
+              <rect x="70" y="188" width="60" height="40" rx="12" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <line x1="100" y1="191" x2="100" y2="225" stroke="#c9a87a" stroke-width="0.8" stroke-dasharray="2,2" opacity="0.6"/>
+              <text x="100" y="244" text-anchor="middle" class="body-label">Hips</text>
+            </g>
+            <!-- Left Leg (back) -->
+            <g class="body-part" id="bpb-left-leg" onclick="selectBodyPart('leg','Left Leg')" title="Left Leg">
+              <rect x="70" y="228" width="26" height="84" rx="10" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="66" y="312" width="26" height="56" rx="9" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="58" y="364" width="36" height="16" rx="7" fill="#c9a87a" stroke="#a07855" stroke-width="1"/>
+              <text x="79" y="393" text-anchor="middle" class="body-label">L.Leg</text>
+            </g>
+            <!-- Right Leg (back) -->
+            <g class="body-part" id="bpb-right-leg" onclick="selectBodyPart('leg','Right Leg')" title="Right Leg">
+              <rect x="104" y="228" width="26" height="84" rx="10" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="108" y="312" width="26" height="56" rx="9" fill="#e8d5c4" stroke="#c9a87a" stroke-width="1.5"/>
+              <rect x="106" y="364" width="36" height="16" rx="7" fill="#c9a87a" stroke="#a07855" stroke-width="1"/>
+              <text x="121" y="393" text-anchor="middle" class="body-label">R.Leg</text>
+            </g>
+          </svg>
+
           <div class="selected-part-badge" id="selectedPartBadge" style="display:none">
             <i class="fas fa-map-marker-alt"></i> <span id="selectedPartName"></span>
             <button onclick="clearBodyPart()"><i class="fas fa-times"></i></button>
@@ -2444,6 +2543,19 @@ app.get('*', (c) => {
         <button class="medbot-page-send-btn" onclick="medbotPageSend()" aria-label="Send"><i class="fas fa-paper-plane"></i></button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ═══ My Profile Page (Bottom Nav) ═══ -->
+<div id="page-myProfile" class="page">
+  <div class="page-header-bg profile-header">
+    <div class="container">
+      <h1><i class="fas fa-user-circle"></i> My Profile</h1>
+      <p>Your personal health dashboard</p>
+    </div>
+  </div>
+  <div class="container" style="max-width:720px;padding-bottom:100px" id="myProfileContent">
+    <div class="loading-state" style="padding:80px 20px"><div class="spinner"></div><p>Loading profile...</p></div>
   </div>
 </div>
 
@@ -2741,7 +2853,7 @@ app.get('*', (c) => {
     <i class="fas fa-home"></i>
     <span>Home</span>
   </button>
-  <button class="bottom-nav-item" id="bnDoctors" onclick="showPage('findDoctors'); setBottomNav('bnDoctors')" aria-label="Doctors">
+  <button class="bottom-nav-item" id="bnDoctors" onclick="showPage('findDoctors'); setBottomNav('bnDoctors')" aria-label="Find Doctors">
     <i class="fas fa-stethoscope"></i>
     <span>Doctors</span>
   </button>
@@ -2754,9 +2866,9 @@ app.get('*', (c) => {
     <span>Appts</span>
     <span class="bottom-nav-badge" id="apptBadge" style="display:none">0</span>
   </button>
-  <button class="bottom-nav-item" id="bnChat" onclick="showPage('chat'); setBottomNav('bnChat')" aria-label="MedBot">
-    <i class="fas fa-comment-medical"></i>
-    <span>MedBot</span>
+  <button class="bottom-nav-item" id="bnProfile" onclick="showPage('myProfile'); setBottomNav('bnProfile')" aria-label="My Profile">
+    <i class="fas fa-user-circle"></i>
+    <span>My Profile</span>
   </button>
 </nav>
 

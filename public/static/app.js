@@ -102,8 +102,16 @@ function showPage(page) {
   if (page === 'nearby') loadNearbyServices();
   if (page === 'dashboard') loadDashboard();
   if (page === 'profile') loadProfile();
+  if (page === 'myProfile') loadMyProfilePage();
   if (page === 'reports') loadReportsPage();
   if (page === 'chat') initMedbotPage();
+
+  // Push history state for back navigation
+  const stateObj = { page };
+  const url = '#' + page;
+  if (window.history.state?.page !== page) {
+    window.history.pushState(stateObj, '', url);
+  }
 }
 
 // ─── BOTTOM NAV SYNC ──────────────────────────────────
@@ -112,7 +120,7 @@ const PAGE_TO_BOTTOM_NAV = {
   findDoctors: 'bnDoctors',
   aiChecker: 'bnAI',
   appointments: 'bnAppts',
-  chat: 'bnChat',
+  myProfile: 'bnProfile',
 };
 
 function syncBottomNav(page) {
@@ -130,6 +138,39 @@ function toggleMenu() {
   $('navMenu').classList.toggle('open');
   $('hamburger').classList.toggle('active');
 }
+
+// ─── BACK NAVIGATION (Android & Browser) ──────────────
+window.addEventListener('popstate', (e) => {
+  // If there are open modals, close the topmost one first
+  const openModals = $$('.modal-overlay.open');
+  if (openModals.length > 0) {
+    closeModal(openModals[openModals.length - 1].id);
+    window.history.pushState({ page: state.currentPage }, '', '#' + state.currentPage);
+    return;
+  }
+  // Navigate to page from history state
+  if (e.state && e.state.page) {
+    const page = e.state.page;
+    $$('.page').forEach(p => p.classList.remove('active'));
+    $$('.nav-link').forEach(l => l.classList.remove('active'));
+    const el = $(`page-${page}`);
+    if (el) {
+      el.classList.add('active');
+      state.currentPage = page;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      syncBottomNav(page);
+      // Trigger lazy loads without pushing history again
+      if (page === 'findDoctors') loadDoctors();
+      if (page === 'appointments') loadAppointments();
+      if (page === 'nearby') loadNearbyServices();
+      if (page === 'dashboard') loadDashboard();
+      if (page === 'myProfile') loadMyProfilePage();
+    }
+  } else {
+    // At root — show home
+    showPage('home');
+  }
+});
 
 // ─── NAVBAR SCROLL ────────────────────────────────────
 window.addEventListener('scroll', () => {
@@ -396,19 +437,30 @@ function filterBySpec(spec) {
   showPage('findDoctors');
   setBottomNav('bnDoctors');
   setTimeout(() => {
-    // Map generic spec names to our HD dropdown values
-    const specMap = {
-      'Cardiologist': 'Cardiology', 'Cardiology': 'Cardiology',
-      'Orthopedic': 'Orthopaedics', 'Orthopaedics': 'Orthopaedics',
-      'Neurologist': 'Neuro & Spine Surgery', 'Neuro': 'Neuro & Spine Surgery',
-      'Gynecologist': 'Obstetrics & Gynaecology', 'Obstetrics': 'Obstetrics & Gynaecology',
-      'Paediatrics': 'Paediatrics', 'Nephrologist': 'Nephrology', 'Nephrology': 'Nephrology',
-      'Urologist': 'Urology', 'Urology': 'Urology',
-      'Oncology': 'Surgical Oncology',
+    // Map specialty card labels to search terms that match DB specialization strings
+    // We use the search field (not dropdown) for maximum flexibility
+    const searchTermMap = {
+      'Cardiology':      'Cardiologist',
+      'Orthopaedics':    'Orthopaedic',
+      'Obstetrics':      'Gynecologist',
+      'OBG':             'Gynecologist',
+      'Paediatrics':     'Pediatrician',
+      'Neuro':           'Neurologist',
+      'Neuro Surgery':   'Neurosurgeon',
+      'Nephrology':      'Nephrologist',
+      'Urology':         'Urologist',
+      'Oncology':        'Oncologist',
+      'Dermatology':     'Dermatologist',
+      'Ophthalmology':   'Ophthalmologist',
+      'ENT':             'ENT',
+      'Psychiatry':      'Psychiatrist',
+      'Pulmonology':     'Pulmonologist',
+      'General Medicine':'General Medicine',
     };
-    const mappedSpec = specMap[spec] || spec;
-    // Use text search since dropdown might not have exact value
-    if ($('doctorSearch')) $('doctorSearch').value = spec;
+    const searchTerm = searchTermMap[spec] || spec;
+    // Clear dropdown, use search text box for DB-matching
+    if ($('specFilter')) $('specFilter').value = '';
+    if ($('doctorSearch')) $('doctorSearch').value = searchTerm;
     loadDoctors();
   }, 300);
 }
@@ -774,24 +826,100 @@ async function showDoctorDetail(doctorId) {
 }
 
 // ─── BODY DIAGRAM ─────────────────────────────────────
+// Track body view (front/back) and last-tapped part for zoom-on-tap
+const bodyDiagramState = { view: 'front', lastPart: null, lastTime: 0 };
+
+// Region info for zoom card
+const BODY_REGION_INFO = {
+  head:         { icon: 'fa-brain',       label: 'Head & Face',    desc: 'Includes skull, brain, eyes, ears, nose, sinuses, jaw and scalp.' },
+  neck:         { icon: 'fa-lungs',       label: 'Neck / Throat',  desc: 'Covers throat, cervical spine, thyroid, lymph nodes and carotid vessels.' },
+  chest:        { icon: 'fa-heartbeat',   label: 'Chest',          desc: 'Heart, lungs, ribs, sternum and upper digestive tract (oesophagus).' },
+  shoulder:     { icon: 'fa-bone',        label: 'Shoulder',       desc: 'Shoulder joint, rotator cuff muscles, clavicle and scapula.' },
+  abdomen:      { icon: 'fa-stomach',     label: 'Abdomen',        desc: 'Stomach, liver, gallbladder, spleen, pancreas, small intestine.' },
+  pelvis:       { icon: 'fa-venus-mars',  label: 'Pelvis / Hips',  desc: 'Hip joints, bladder, reproductive organs and pelvic floor muscles.' },
+  arm:          { icon: 'fa-hand-paper',  label: 'Arm / Hand',     desc: 'Shoulder to wrist: humerus, elbow, forearm, wrist and hand.' },
+  leg:          { icon: 'fa-walking',     label: 'Leg / Knee / Foot', desc: 'Thigh, knee joint, shin, calf, ankle and foot.' },
+  'upper-back': { icon: 'fa-spine',       label: 'Upper Back',     desc: 'Thoracic spine, trapezius, rhomboid muscles and scapular area.' },
+  'lower-back': { icon: 'fa-spine',       label: 'Lower Back',     desc: 'Lumbar spine, sacrum, erector spinae and surrounding muscles.' },
+};
+
 function selectBodyPart(part, displayName) {
+  const now = Date.now();
+  const isDoubleTap = (bodyDiagramState.lastPart === part) && (now - bodyDiagramState.lastTime < 600);
+  bodyDiagramState.lastPart = part;
+  bodyDiagramState.lastTime = now;
+
   state.selectedBodyPart = part;
   // Remove selected from ALL body-part groups first
   $$('.body-part').forEach(g => g.classList.remove('selected'));
-  // Match by part name: e.g. 'arm' matches both 'bp-left-arm' and 'bp-right-arm'
-  $$('[id^="bp-"]').forEach(g => {
-    if (g.id === `bp-${part}` || g.id.includes(`-${part}`) || g.id === `bp-${part}s`) {
+  // Match by part name in both front (bp-) and back (bpb-) views
+  $$('[id^="bp-"],[id^="bpb-"]').forEach(g => {
+    const idPart = g.id.replace(/^bpb?-/, '').replace(/^(left|right)-/, '').replace(/-.*/, '');
+    if (idPart === part || g.id.endsWith(`-${part}`) || g.id === `bp-${part}` || g.id === `bpb-${part}`) {
       g.classList.add('selected');
     }
   });
-  $('selectedPartBadge').style.display = 'flex';
-  $('selectedPartName').textContent = displayName;
+  const badge = $('selectedPartBadge');
+  if (badge) { badge.style.display = 'flex'; $('selectedPartName').textContent = displayName; }
+
+  // On double-tap / second tap — show zoom card
+  if (isDoubleTap) { showBodyZoom(part, displayName); }
 }
 
 function clearBodyPart() {
   state.selectedBodyPart = null;
+  bodyDiagramState.lastPart = null;
   $$('.body-part').forEach(g => g.classList.remove('selected'));
-  $('selectedPartBadge').style.display = 'none';
+  const badge = $('selectedPartBadge');
+  if (badge) badge.style.display = 'none';
+}
+
+function switchBodyView(view) {
+  bodyDiagramState.view = view;
+  const front = $('bodyDiagramFront');
+  const back  = $('bodyDiagramBack');
+  const btnF  = $('bvFront');
+  const btnB  = $('bvBack');
+  if (view === 'front') {
+    if (front) front.style.display = '';
+    if (back)  back.style.display  = 'none';
+    if (btnF) btnF.classList.add('active');
+    if (btnB) btnB.classList.remove('active');
+  } else {
+    if (front) front.style.display = 'none';
+    if (back)  back.style.display  = '';
+    if (btnF) btnF.classList.remove('active');
+    if (btnB) btnB.classList.add('active');
+  }
+  clearBodyPart();
+}
+
+function showBodyZoom(part, displayName) {
+  // Remove existing overlay if any
+  const existing = $('bodyZoomOverlay');
+  if (existing) existing.remove();
+
+  const info = BODY_REGION_INFO[part] || { icon: 'fa-dot-circle', label: displayName, desc: 'Tap the symptom button to log your concern.' };
+  const overlay = document.createElement('div');
+  overlay.id = 'bodyZoomOverlay';
+  overlay.className = 'body-zoom-overlay';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div class="body-zoom-card">
+      <button class="body-zoom-close" onclick="document.getElementById('bodyZoomOverlay').remove()"><i class="fas fa-times"></i></button>
+      <h3><i class="fas ${info.icon}" style="color:var(--primary)"></i> ${info.label}</h3>
+      <p>${info.desc}</p>
+      <button class="body-zoom-symptom-btn" onclick="
+        document.getElementById('bodyZoomOverlay').remove();
+        const inp = document.getElementById('symptomInput');
+        if(inp){ inp.focus(); inp.placeholder='Describe ${displayName} symptoms…'; }
+        const tabEl = document.querySelector('.ai-tab');
+        if(tabEl && !tabEl.classList.contains('active')) tabEl.click();
+      ">
+        <i class="fas fa-plus-circle"></i> Add ${displayName} Symptoms
+      </button>
+    </div>`;
+  document.body.appendChild(overlay);
 }
 
 // ─── SYMPTOM INPUT ────────────────────────────────────
@@ -865,6 +993,28 @@ async function analyzeSymptoms() {
     showToast('Please add at least one symptom', 'warning'); return;
   }
 
+  // Emergency check — before calling API, warn immediately for red-flag symptoms
+  const emergencySymptoms = [
+    'chest pain', 'severe chest pain', 'shortness of breath', 'difficulty breathing',
+    'unconscious', 'not breathing', 'stroke', 'facial drooping', 'sudden numbness',
+    'seizure', 'convulsion', 'severe bleeding', 'uncontrolled bleeding',
+    'severe head injury', 'suicidal', 'overdose'
+  ];
+  const sympLower = state.symptoms.map(s => s.toLowerCase());
+  const isEmergency = emergencySymptoms.some(e =>
+    sympLower.some(s => s.includes(e) || e.includes(s))
+  );
+  if (isEmergency) {
+    // Show emergency alert immediately
+    const emergDiv = $('aiResults');
+    if (emergDiv) {
+      emergDiv.style.display = 'block';
+      $('urgencyAlert').className = 'urgency-alert urgency-emergency';
+      $('urgencyAlert').innerHTML = '🚨 <strong>EMERGENCY: Please call 112 or go to the nearest hospital immediately!</strong><br><small>Do not wait for AI analysis for potentially life-threatening symptoms.</small>';
+      emergDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+
   const btn = $('analyzeBtn');
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing with AI...';
@@ -878,7 +1028,19 @@ async function analyzeSymptoms() {
   btn.innerHTML = '<i class="fas fa-robot"></i> Analyze Symptoms with AI';
 
   if (!res.ok || !res.data.success) {
-    showToast('Analysis failed. Please try again.', 'error'); return;
+    showToast('Analysis failed. Please try again.', 'error');
+    // Show fallback if API fails
+    const emergDiv = $('aiResults');
+    if (emergDiv) {
+      emergDiv.style.display = 'block';
+      $('aiPredictions').innerHTML = `
+        <div class="urgency-alert urgency-moderate" style="margin:12px 0">
+          <i class="fas fa-exclamation-circle"></i>
+          <strong>AI analysis is temporarily unavailable.</strong><br>
+          Please consult a General Physician for your symptoms. For emergencies, call 112 immediately.
+        </div>`;
+    }
+    return;
   }
 
   const { analysis, matchedDoctors } = res.data;
@@ -892,20 +1054,27 @@ function displayAIResults(analysis, doctors) {
 
   // Urgency
   const urgencyMessages = {
-    emergency: { text: '🚨 EMERGENCY: Please go to the nearest hospital immediately!', cls: 'urgency-emergency' },
-    high: { text: '⚠️ High Priority: Please consult a doctor as soon as possible.', cls: 'urgency-high' },
-    moderate: { text: '📋 Moderate: Schedule an appointment with a doctor soon.', cls: 'urgency-moderate' },
-    low: { text: '✅ Low Priority: Monitor symptoms. Consult if they persist.', cls: 'urgency-low' }
+    emergency: { text: '🚨 EMERGENCY: Please call 112 or go to the nearest hospital immediately! Do not delay.', cls: 'urgency-emergency' },
+    high: { text: '⚠️ High Priority: These symptoms need prompt medical attention. Please consult a doctor today.', cls: 'urgency-high' },
+    moderate: { text: '📋 Moderate: Please schedule an appointment with a doctor soon.', cls: 'urgency-moderate' },
+    low: { text: '✅ Low Priority: Monitor your symptoms. Consult a doctor if they persist or worsen.', cls: 'urgency-low' }
   };
   const urg = urgencyMessages[analysis.urgencyLevel] || urgencyMessages.low;
   $('urgencyAlert').className = `urgency-alert ${urg.cls}`;
-  $('urgencyAlert').textContent = urg.text;
+  $('urgencyAlert').innerHTML = urg.text;
 
   // Predictions
   if (analysis.predictions.length === 0) {
     $('aiPredictions').innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><h3>No specific condition matched</h3><p>Try adding more detailed symptoms or consult a General Physician</p></div>';
   } else {
-    $('aiPredictions').innerHTML = analysis.predictions.map(p => `
+    $('aiPredictions').innerHTML = `
+      <div class="ai-disclaimer-note">
+        <i class="fas fa-info-circle"></i>
+        <strong>Educational Information Only</strong> — These are possible conditions based on symptom patterns.
+        The percentages shown are <em>symptom match scores</em>, not diagnostic accuracy.
+        This is NOT a medical diagnosis. Please consult a qualified doctor for personal medical advice.
+      </div>
+    ` + analysis.predictions.map(p => `
       <div class="prediction-card">
         <div>
           <div class="prediction-disease">${p.disease}</div>
@@ -1783,6 +1952,331 @@ async function savePatientProfile() {
   }
 }
 
+// ─── MY PROFILE PAGE (Bottom Nav) ────────────────────
+// Full structured patient profile accessible from bottom nav
+async function loadMyProfilePage() {
+  const container = $('myProfileContent');
+  if (!container) return;
+
+  if (!state.currentUser) {
+    container.innerHTML = `
+      <div class="auth-required-card">
+        <i class="fas fa-user-circle" style="font-size:3rem;color:var(--primary);margin-bottom:16px"></i>
+        <h3>Sign In to View Your Profile</h3>
+        <p>Access your medical history, appointments, and health records</p>
+        <button class="btn-primary" onclick="openModal('loginModal')">
+          <i class="fas fa-sign-in-alt"></i> Sign In
+        </button>
+        <button class="btn-secondary-hero" onclick="openModal('registerModal')" style="margin-top:10px;justify-content:center">
+          <i class="fas fa-user-plus"></i> Create Account
+        </button>
+      </div>`;
+    return;
+  }
+
+  const user = state.currentUser;
+  container.innerHTML = '<div class="loading-state" style="padding:60px 20px"><div class="spinner"></div><p>Loading profile...</p></div>';
+
+  // Load patient profile data
+  let profileData = {};
+  let appointments = [];
+  let reports = [];
+
+  try {
+    if (user.type === 'patient') {
+      const [profRes, apptRes, rptRes] = await Promise.all([
+        apiCall('/api/patients/profile'),
+        apiCall('/api/appointments/patient'),
+        apiCall('/api/reports')
+      ]);
+      if (profRes.ok && profRes.data.success) profileData = profRes.data.patient;
+      if (apptRes.ok && apptRes.data.success) appointments = apptRes.data.appointments || [];
+      if (rptRes.ok && rptRes.data.reports) reports = rptRes.data.reports || [];
+    } else {
+      const profRes = await apiCall('/api/doctors/profile');
+      if (profRes.ok && profRes.data.success) profileData = profRes.data.doctor || {};
+    }
+  } catch(e) {}
+
+  const initials = (profileData.name || user.name || 'U').split(' ').filter(Boolean).map(n=>n[0]).join('').substring(0,2).toUpperCase();
+  const upcoming = appointments.filter(a => ['pending','confirmed'].includes(a.status));
+  const past = appointments.filter(a => ['completed','cancelled'].includes(a.status));
+
+  if (user.type === 'doctor') {
+    // Doctor profile — redirect to existing profile page
+    showPage('profile');
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="my-profile-page">
+      <!-- Profile Header Card -->
+      <div class="mp-header-card">
+        <div class="mp-avatar">${profileData.profile_image
+          ? `<img src="${profileData.profile_image}" alt="Profile">`
+          : initials}
+        </div>
+        <div class="mp-header-info">
+          <h2 class="mp-name">${profileData.name || user.name}</h2>
+          <div class="mp-type"><i class="fas fa-user"></i> Patient</div>
+          ${profileData.blood_group ? `<div class="mp-blood"><i class="fas fa-tint" style="color:#e53e3e"></i> ${profileData.blood_group}</div>` : ''}
+          ${profileData.city ? `<div class="mp-city"><i class="fas fa-map-marker-alt"></i> ${profileData.city}${profileData.state ? ', ' + profileData.state : ''}</div>` : ''}
+        </div>
+        <button class="mp-edit-btn" onclick="switchToProfileEdit()"><i class="fas fa-edit"></i> Edit</button>
+      </div>
+
+      <!-- Stats strip -->
+      <div class="mp-stats-strip">
+        <div class="mp-stat"><div class="mp-stat-num">${upcoming.length}</div><div class="mp-stat-label">Upcoming</div></div>
+        <div class="mp-stat"><div class="mp-stat-num">${past.length}</div><div class="mp-stat-label">Past Visits</div></div>
+        <div class="mp-stat"><div class="mp-stat-num">${reports.length}</div><div class="mp-stat-label">Records</div></div>
+      </div>
+
+      <!-- Section tabs -->
+      <div class="mp-tabs">
+        <button class="mp-tab active" onclick="switchMpTab('info', this)"><i class="fas fa-user"></i> Info</button>
+        <button class="mp-tab" onclick="switchMpTab('health', this)"><i class="fas fa-heartbeat"></i> Health</button>
+        <button class="mp-tab" onclick="switchMpTab('appts', this)"><i class="fas fa-calendar-check"></i> Appts</button>
+        <button class="mp-tab" onclick="switchMpTab('records', this)"><i class="fas fa-file-medical"></i> Records</button>
+        <button class="mp-tab" onclick="switchMpTab('settings', this)"><i class="fas fa-cog"></i> Settings</button>
+      </div>
+
+      <!-- Personal Info -->
+      <div id="mp-panel-info" class="mp-panel active">
+        <div class="mp-section-card">
+          <h4><i class="fas fa-user-circle"></i> Personal Details</h4>
+          <div class="mp-info-grid">
+            <div class="mp-info-row"><span class="mp-info-label">Full Name</span><span class="mp-info-val">${profileData.name || '—'}</span></div>
+            <div class="mp-info-row"><span class="mp-info-label">Email</span><span class="mp-info-val">${profileData.email || user.email || '—'}</span></div>
+            <div class="mp-info-row"><span class="mp-info-label">Phone</span><span class="mp-info-val">${profileData.phone || '—'}</span></div>
+            <div class="mp-info-row"><span class="mp-info-label">Date of Birth</span><span class="mp-info-val">${profileData.dob ? formatDate(profileData.dob) : '—'}</span></div>
+            <div class="mp-info-row"><span class="mp-info-label">Gender</span><span class="mp-info-val">${profileData.gender || '—'}</span></div>
+            <div class="mp-info-row"><span class="mp-info-label">Blood Group</span><span class="mp-info-val">${profileData.blood_group || '—'}</span></div>
+            <div class="mp-info-row"><span class="mp-info-label">Address</span><span class="mp-info-val">${profileData.address || '—'}</span></div>
+            <div class="mp-info-row"><span class="mp-info-label">City</span><span class="mp-info-val">${profileData.city || '—'}</span></div>
+            <div class="mp-info-row"><span class="mp-info-label">State</span><span class="mp-info-val">${profileData.state || '—'}</span></div>
+            <div class="mp-info-row"><span class="mp-info-label">Pincode</span><span class="mp-info-val">${profileData.pincode || '—'}</span></div>
+          </div>
+          <button class="mp-action-btn" onclick="switchToProfileEdit()"><i class="fas fa-edit"></i> Edit Personal Info</button>
+        </div>
+      </div>
+
+      <!-- Health Info -->
+      <div id="mp-panel-health" class="mp-panel" style="display:none">
+        <div class="mp-section-card">
+          <h4><i class="fas fa-heartbeat"></i> Medical History</h4>
+          ${(profileData.medical_history || []).length > 0
+            ? `<div class="mp-tags">${profileData.medical_history.map(m => `<span class="mp-tag">${m}</span>`).join('')}</div>`
+            : '<p class="mp-empty">No medical history recorded</p>'}
+        </div>
+        <div class="mp-section-card">
+          <h4><i class="fas fa-allergies"></i> Allergies</h4>
+          ${(profileData.allergies || []).length > 0
+            ? `<div class="mp-tags">${profileData.allergies.map(a => `<span class="mp-tag allergy">${a}</span>`).join('')}</div>`
+            : '<p class="mp-empty">No allergies recorded</p>'}
+        </div>
+        <div class="mp-section-card">
+          <h4><i class="fas fa-pills"></i> Current Medications</h4>
+          ${(profileData.current_medications || []).length > 0
+            ? `<div class="mp-tags">${profileData.current_medications.map(m => `<span class="mp-tag med">${m}</span>`).join('')}</div>`
+            : '<p class="mp-empty">No medications recorded</p>'}
+        </div>
+        <div class="mp-section-card">
+          <h4><i class="fas fa-phone-alt"></i> Emergency Contact</h4>
+          ${profileData.emergency_contact
+            ? (() => { try { const ec = typeof profileData.emergency_contact === 'string' ? JSON.parse(profileData.emergency_contact) : profileData.emergency_contact;
+              return `<div class="mp-info-grid">
+                <div class="mp-info-row"><span class="mp-info-label">Name</span><span class="mp-info-val">${ec.name || '—'}</span></div>
+                <div class="mp-info-row"><span class="mp-info-label">Relation</span><span class="mp-info-val">${ec.relation || '—'}</span></div>
+                <div class="mp-info-row"><span class="mp-info-label">Phone</span><span class="mp-info-val">${ec.phone ? `<a href="tel:${ec.phone}">${ec.phone}</a>` : '—'}</span></div>
+              </div>`; } catch(e){ return '<p class="mp-empty">No emergency contact recorded</p>'; } })()
+            : '<p class="mp-empty">No emergency contact recorded</p>'}
+          <button class="mp-action-btn" onclick="switchToProfileEdit()"><i class="fas fa-edit"></i> Update Health Info</button>
+        </div>
+      </div>
+
+      <!-- Appointments -->
+      <div id="mp-panel-appts" class="mp-panel" style="display:none">
+        <div class="mp-section-card">
+          <h4><i class="fas fa-calendar-check"></i> Upcoming Appointments (${upcoming.length})</h4>
+          ${upcoming.length === 0
+            ? `<div class="empty-state" style="padding:24px 0"><i class="fas fa-calendar"></i><h3>No upcoming appointments</h3><p>Book your first appointment</p></div>
+               <button class="mp-action-btn" onclick="showPage('findDoctors')"><i class="fas fa-search"></i> Find Doctors</button>`
+            : upcoming.map(a => `
+              <div class="mp-appt-row">
+                <div class="mp-appt-avatar">${(a.doctor_name || 'D').split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase()}</div>
+                <div class="mp-appt-info">
+                  <div class="mp-appt-name">${a.doctor_name || 'Doctor'}</div>
+                  <div class="mp-appt-spec">${a.specialization || ''}</div>
+                  <div class="mp-appt-date"><i class="fas fa-calendar"></i> ${formatDate(a.appointment_date)} · ${a.appointment_time}</div>
+                </div>
+                <span class="appt-status status-${a.status}">${a.status}</span>
+              </div>`).join('')}
+        </div>
+        <div class="mp-section-card">
+          <h4><i class="fas fa-history"></i> Past Visits (${past.length})</h4>
+          ${past.length === 0
+            ? '<p class="mp-empty">No past appointments</p>'
+            : past.slice(0,5).map(a => `
+              <div class="mp-appt-row" style="opacity:0.7">
+                <div class="mp-appt-avatar">${(a.doctor_name || 'D').split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase()}</div>
+                <div class="mp-appt-info">
+                  <div class="mp-appt-name">${a.doctor_name || 'Doctor'}</div>
+                  <div class="mp-appt-date"><i class="fas fa-calendar"></i> ${formatDate(a.appointment_date)}</div>
+                </div>
+                <span class="appt-status status-${a.status}">${a.status}</span>
+              </div>`).join('')}
+          ${past.length > 5 ? `<button class="mp-action-btn" onclick="showPage('appointments')" style="margin-top:12px"><i class="fas fa-arrow-right"></i> View All Appointments</button>` : ''}
+        </div>
+      </div>
+
+      <!-- Records -->
+      <div id="mp-panel-records" class="mp-panel" style="display:none">
+        <div class="mp-section-card">
+          <h4><i class="fas fa-file-medical-alt"></i> Health Records (${reports.length})</h4>
+          ${reports.length === 0
+            ? '<div class="empty-state" style="padding:24px 0"><i class="fas fa-file-medical-alt"></i><h3>No records yet</h3><p>Upload lab reports or access via your dashboard</p></div>'
+            : reports.slice(0,8).map(r => `
+              <div class="mp-record-row">
+                <i class="fas fa-file-medical mp-record-icon"></i>
+                <div class="mp-record-info">
+                  <div class="mp-record-title">${r.report_title || 'Medical Record'}</div>
+                  <div class="mp-record-meta">${r.report_type || 'Document'} · ${r.report_date ? formatDate(r.report_date) : (r.created_at ? formatDate(r.created_at) : '')}</div>
+                </div>
+                ${r.file_url ? `<a href="${r.file_url}" target="_blank" class="mp-btn-view"><i class="fas fa-external-link-alt"></i></a>` : ''}
+              </div>`).join('')}
+          <button class="mp-action-btn" onclick="showPage('dashboard')" style="margin-top:12px"><i class="fas fa-plus"></i> Upload New Record</button>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div id="mp-panel-settings" class="mp-panel" style="display:none">
+        <div class="mp-section-card">
+          <h4><i class="fas fa-cog"></i> Account Settings</h4>
+          <div class="mp-settings-list">
+            <button class="mp-setting-row" onclick="switchToProfileEdit()">
+              <span><i class="fas fa-edit"></i> Edit Profile</span><i class="fas fa-chevron-right"></i>
+            </button>
+            <button class="mp-setting-row" onclick="showPage('appointments')">
+              <span><i class="fas fa-calendar-check"></i> My Appointments</span><i class="fas fa-chevron-right"></i>
+            </button>
+            <button class="mp-setting-row" onclick="showPage('dashboard')">
+              <span><i class="fas fa-tachometer-alt"></i> My Dashboard</span><i class="fas fa-chevron-right"></i>
+            </button>
+            <button class="mp-setting-row" onclick="showPage('nearby')">
+              <span><i class="fas fa-hospital-alt"></i> Nearby Hospitals</span><i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        <div class="mp-section-card">
+          <h4><i class="fas fa-shield-alt"></i> Privacy & Legal</h4>
+          <div class="mp-settings-list">
+            <button class="mp-setting-row" onclick="showPrivacyPolicy()">
+              <span><i class="fas fa-lock"></i> Privacy Policy</span><i class="fas fa-chevron-right"></i>
+            </button>
+            <button class="mp-setting-row" onclick="showTermsOfUse()">
+              <span><i class="fas fa-file-contract"></i> Terms of Use</span><i class="fas fa-chevron-right"></i>
+            </button>
+            <button class="mp-setting-row" onclick="showMedDisclaimer()">
+              <span><i class="fas fa-info-circle"></i> Medical Disclaimer</span><i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        <div class="mp-section-card">
+          <h4><i class="fas fa-sign-out-alt"></i> Account Actions</h4>
+          <button class="mp-action-btn danger" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Sign Out</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function switchMpTab(tab, btn) {
+  $$('.mp-tab').forEach(t => t.classList.remove('active'));
+  $$('.mp-panel').forEach(p => p.style.display = 'none');
+  if (btn) btn.classList.add('active');
+  const panel = $(`mp-panel-${tab}`);
+  if (panel) panel.style.display = 'block';
+}
+
+function switchToProfileEdit() {
+  showPage('profile');
+}
+
+function showPrivacyPolicy() {
+  openInfoModal('Privacy Policy', `
+    <h4>Data We Collect</h4>
+    <p>We collect name, email, phone, medical history, and appointment data to provide our healthcare matching service.</p>
+    <h4>How We Use It</h4>
+    <p>Your data is used solely to connect you with appropriate healthcare providers and manage your appointments. We do not sell your personal data.</p>
+    <h4>Data Storage & Security</h4>
+    <p>All data is stored securely with encryption at rest and in transit. Medical data is accessible only to you and doctors you authorize.</p>
+    <h4>Your Rights</h4>
+    <p>You have the right to access, correct, or delete your data. Contact us at support@mydoctors.app for data requests.</p>
+    <h4>DPDPA 2023 Compliance</h4>
+    <p>We follow applicable Indian data protection requirements under the Digital Personal Data Protection Act, 2023.</p>
+    <h4>Contact</h4>
+    <p>Privacy questions: privacy@mydoctors.app | Hubballi, Karnataka, India</p>
+  `);
+}
+
+function showTermsOfUse() {
+  openInfoModal('Terms of Use', `
+    <h4>Acceptance</h4>
+    <p>By using MyDoctor's, you agree to these terms. If you disagree, please do not use the service.</p>
+    <h4>Service Description</h4>
+    <p>MyDoctor's is a healthcare marketplace connecting patients with doctors. We are not a medical provider.</p>
+    <h4>User Responsibilities</h4>
+    <p>You are responsible for providing accurate information. Do not use this platform for emergencies — call 112.</p>
+    <h4>AI Features</h4>
+    <p>AI symptom analysis is for informational purposes only. It does not constitute a medical diagnosis.</p>
+    <h4>Appointments</h4>
+    <p>Booking through MyDoctor's is a scheduling service. The medical relationship is between you and your doctor.</p>
+    <h4>Limitation of Liability</h4>
+    <p>MyDoctor's is not liable for medical outcomes. Always consult a qualified healthcare professional for medical decisions.</p>
+  `);
+}
+
+function showMedDisclaimer() {
+  openInfoModal('Medical Disclaimer', `
+    <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:16px;margin-bottom:16px">
+      <strong>⚠️ IMPORTANT: This is NOT a medical service</strong>
+    </div>
+    <p><strong>MyDoctor's AI features provide general health information only.</strong></p>
+    <ul>
+      <li>AI symptom analysis does NOT replace professional medical diagnosis</li>
+      <li>Confidence percentages shown are symptom match scores, not diagnostic accuracy</li>
+      <li>Do NOT rely on this app for emergency medical decisions</li>
+      <li>Always consult a qualified, registered medical professional for health concerns</li>
+      <li>For emergencies, call 112 immediately or go to your nearest hospital</li>
+    </ul>
+    <p>Doctor profiles are based on publicly available information and user submissions. Verify credentials independently before making healthcare decisions.</p>
+    <p><em>MyDoctor's does not hold any medical license and is not responsible for clinical outcomes.</em></p>
+  `);
+}
+
+function openInfoModal(title, content) {
+  // Create or reuse a generic info modal
+  let modal = $('infoModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'infoModal';
+    modal.className = 'modal-overlay';
+    modal.onclick = (e) => { if (e.target === modal) closeModal('infoModal'); };
+    modal.innerHTML = `
+      <div class="modal-box" style="max-width:520px;max-height:85vh;overflow-y:auto">
+        <div class="modal-header">
+          <h2 id="infoModalTitle"></h2>
+          <button class="modal-close" onclick="closeModal('infoModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" id="infoModalBody"></div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  $('infoModalTitle').textContent = title;
+  $('infoModalBody').innerHTML = content;
+  openModal('infoModal');
+}
+
 // ─── INTERSECTION OBSERVER (stats) ───────────────────
 const statsObserver = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
@@ -2435,7 +2929,7 @@ function medbotPageAppend(role, text) {
 function loadReportsPage() {
   const gate = $('reportsAuthGate');
   const wrap = $('reportsListWrap');
-  if (!state.user) {
+  if (!state.currentUser) {   // Fixed: was state.user (wrong)
     if (gate) gate.style.display = '';
     if (wrap) wrap.innerHTML = '';
     return;
