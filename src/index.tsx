@@ -2172,6 +2172,7 @@ app.get('/api/admin/me', async (c) => {
 // are served directly by Cloudflare Pages CDN as static files.
 // They are excluded from the Worker via _routes.json (in public/).
 // serveStatic for /static/* handles the local wrangler pages dev fallback.
+// Admin panel: /static/admin  (wrangler dev strips .html → serves admin.html at /static/admin)
 app.use('/static/*', serveStatic({ root: './public' }))
 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
