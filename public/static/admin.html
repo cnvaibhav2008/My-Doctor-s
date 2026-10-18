@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyDoctor's Admin Panel</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--primary:#0ea5e9;--dark:#0f172a;--sidebar:#1e293b;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;--success:#22c55e;--danger:#ef4444;--warn:#f59e0b;--radius:10px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:var(--text);min-height:100vh}
+
+/* ─── LOGIN ─── */
+#loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%)}
+.login-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo i{font-size:48px;color:var(--primary)}
+.login-logo h1{font-size:22px;margin-top:8px;color:var(--text)}
+.login-logo p{color:var(--muted);font-size:13px;margin-top:4px}
+.form-group{margin-bottom:18px}
+.form-group label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:500}
+.form-group input{width:100%;padding:11px 14px;background:#0f172a;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;transition:.2s}
+.form-group input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.15)}
+.btn-login-submit{width:100%;padding:12px;background:linear-gradient(135deg,#0ea5e9,#06b6d4);border:none;border-radius:8px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:.2s;margin-top:6px}
+.btn-login-submit:hover{opacity:.9;transform:translateY(-1px)}
+.btn-login-submit:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.login-error{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);border-radius:8px;padding:10px 14px;font-size:13px;color:#fca5a5;margin-bottom:14px;display:none}
+
+/* ─── CHANGE PASSWORD ─── */
+#changePwdScreen{display:none;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%)}
+
+/* ─── LAYOUT ─── */
+#adminApp{display:none;min-height:100vh}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:240px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:100}
+.sidebar-logo{padding:20px 18px 14px;border-bottom:1px solid var(--border)}
+.sidebar-logo span{font-size:16px;font-weight:700;color:var(--primary)}
+.sidebar-logo small{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.nav-section{padding:14px 10px 6px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;margin:2px 8px;cursor:pointer;font-size:13px;color:var(--muted);transition:.15s;text-decoration:none}
+.nav-item:hover,.nav-item.active{background:rgba(14,165,233,.15);color:var(--primary)}
+.nav-item i{width:16px;text-align:center}
+.sidebar-footer{margin-top:auto;padding:14px;border-top:1px solid var(--border)}
+.admin-badge{font-size:11px;color:var(--muted);margin-bottom:10px}
+.admin-badge strong{color:var(--text);display:block;font-size:13px}
+.btn-logout{width:100%;padding:9px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#fca5a5;font-size:13px;cursor:pointer}
+.btn-logout:hover{background:rgba(239,68,68,.25)}
+.main{margin-left:240px;flex:1;display:flex;flex-direction:column}
+.topbar{background:var(--sidebar);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar h2{font-size:17px;font-weight:600}
+.topbar-meta{font-size:12px;color:var(--muted)}
+.content{padding:24px;flex:1}
+
+/* ─── CARDS ─── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;display:flex;align-items:center;gap:14px}
+.stat-icon{width:46px;height:46px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.stat-num{font-size:26px;font-weight:700;line-height:1}
+.stat-label{font-size:12px;color:var(--muted);margin-top:3px}
+.stat-warn{color:var(--warn) !important}
+
+/* ─── TABLE ─── */
+.panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}
+.panel-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.panel-head h3{font-size:15px;font-weight:600}
+.panel-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.search-input{padding:8px 12px;background:#0f172a;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;width:200px}
+.search-input:focus{outline:none;border-color:var(--primary)}
+.btn{padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;border:none;font-weight:500;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{opacity:.85;transform:translateY(-1px)}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-success{background:rgba(34,197,94,.2);color:var(--success);border:1px solid rgba(34,197,94,.3)}
+.btn-danger{background:rgba(239,68,68,.2);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
+.btn-warn{background:rgba(245,158,11,.2);color:var(--warn);border:1px solid rgba(245,158,11,.3)}
+.btn-sm{padding:5px 10px;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{padding:10px 14px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);background:#0f172a;border-bottom:1px solid var(--border)}
+td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-green{background:rgba(34,197,94,.15);color:var(--success);border:1px solid rgba(34,197,94,.3)}
+.badge-red{background:rgba(239,68,68,.15);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
+.badge-warn{background:rgba(245,158,11,.15);color:var(--warn);border:1px solid rgba(245,158,11,.3)}
+.badge-blue{background:rgba(14,165,233,.15);color:var(--primary);border:1px solid rgba(14,165,233,.3)}
+.badge-gray{background:rgba(148,163,184,.1);color:var(--muted);border:1px solid rgba(148,163,184,.2)}
+.actions-cell{display:flex;gap:6px;flex-wrap:wrap}
+.empty-state{padding:40px;text-align:center;color:var(--muted)}
+.empty-state i{font-size:32px;margin-bottom:10px;opacity:.4}
+
+/* ─── LOADING ─── */
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-row td{text-align:center;padding:30px;color:var(--muted)}
+
+/* ─── TOAST ─── */
+#toast{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast-item{padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;min-width:220px;animation:slideIn .2s ease;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+.toast-success{background:#166534;border:1px solid #22c55e;color:#bbf7d0}
+.toast-error{background:#7f1d1d;border:1px solid #ef4444;color:#fecaca}
+.toast-info{background:#1e3a5f;border:1px solid #0ea5e9;color:#bae6fd}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:none;opacity:1}}
+
+/* ─── MODAL ─── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--sidebar);border:1px solid var(--border);border-radius:14px;padding:28px;max-width:440px;width:100%}
+.modal h3{font-size:16px;margin-bottom:16px}
+.modal-btns{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+
+/* ─── TABS ─── */
+.tab-bar{display:flex;gap:4px;margin-bottom:18px;background:#0f172a;border-radius:10px;padding:4px}
+.tab-btn{flex:1;padding:8px;border:none;background:transparent;color:var(--muted);border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:.15s}
+.tab-btn.active{background:var(--sidebar);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+
+/* ─── FILTERS ─── */
+.filter-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+select.search-input{padding:7px 12px}
+.section-hidden{display:none !important}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:768px){
+  .sidebar{width:200px}
+  .main{margin-left:200px}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .search-input{width:150px}
+}
+@media(max-width:600px){
+  .sidebar{transform:translateX(-100%);transition:.3s}
+  .sidebar.open{transform:none}
+  .main{margin-left:0}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .topbar{padding:12px 16px}
+  .content{padding:16px}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <i class="fas fa-user-shield"></i>
+      <h1>MyDoctor's Admin</h1>
+      <p>Authorized access only</p>
+    </div>
+    <div id="loginError" class="login-error"></div>
+    <form onsubmit="doLogin(event)">
+      <div class="form-group">
+        <label>Admin Email</label>
+        <input type="email" id="loginEmail" placeholder="admin@example.com" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPwd" placeholder="Enter password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-login-submit" id="loginBtn">
+        <i class="fas fa-sign-in-alt"></i> Sign In
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- CHANGE PASSWORD (first login) -->
+<div id="changePwdScreen" style="display:none;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0f172a,#1e3a5f)">
+  <div class="login-card">
+    <div class="login-logo">
+      <i class="fas fa-key" style="color:var(--warn)"></i>
+      <h1>Change Password Required</h1>
+      <p>You must set a new password before continuing</p>
+    </div>
+    <div id="cpwdError" class="login-error"></div>
+    <form onsubmit="doChangePassword(event)">
+      <div class="form-group">
+        <label>Current Password</label>
+        <input type="password" id="cpwdCurrent" required>
+      </div>
+      <div class="form-group">
+        <label>New Password (min 12 characters)</label>
+        <input type="password" id="cpwdNew" required minlength="12">
+      </div>
+      <div class="form-group">
+        <label>Confirm New Password</label>
+        <input type="password" id="cpwdConfirm" required minlength="12">
+      </div>
+      <button type="submit" class="btn-login-submit" id="cpwdBtn">
+        <i class="fas fa-lock"></i> Set New Password
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ADMIN APP -->
+<div id="adminApp">
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <i class="fas fa-user-shield" style="color:var(--primary);margin-right:8px"></i>
+        <span>MyDoctor's Admin</span>
+        <small id="adminRoleBadge">Administrator</small>
+      </div>
+      <div class="nav-section">Overview</div>
+      <a class="nav-item active" onclick="showSection('dashboard')" id="nav-dashboard">
+        <i class="fas fa-tachometer-alt"></i> Dashboard
+      </a>
+      <div class="nav-section">Management</div>
+      <a class="nav-item" onclick="showSection('doctors')" id="nav-doctors">
+        <i class="fas fa-user-md"></i> Doctors
+      </a>
+      <a class="nav-item" onclick="showSection('patients')" id="nav-patients">
+        <i class="fas fa-users"></i> Patients
+      </a>
+      <a class="nav-item" onclick="showSection('appointments')" id="nav-appointments">
+        <i class="fas fa-calendar-check"></i> Appointments
+      </a>
+      <a class="nav-item" onclick="showSection('hospitals')" id="nav-hospitals">
+        <i class="fas fa-hospital"></i> Hospitals
+      </a>
+      <div class="nav-section">Content</div>
+      <a class="nav-item" onclick="showSection('reviews')" id="nav-reviews">
+        <i class="fas fa-star"></i> Reviews
+      </a>
+      <div class="nav-section">Security</div>
+      <a class="nav-item" onclick="showSection('audit')" id="nav-audit">
+        <i class="fas fa-shield-alt"></i> Audit Log
+      </a>
+      <a class="nav-item" onclick="showSection('account')" id="nav-account">
+        <i class="fas fa-key"></i> Account
+      </a>
+      <div class="sidebar-footer">
+        <div class="admin-badge">
+          <strong id="adminNameBadge">Admin</strong>
+          <span id="adminEmailBadge"></span>
+        </div>
+        <button class="btn-logout" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main">
+      <div class="topbar">
+        <h2 id="topbarTitle">Dashboard</h2>
+        <div class="topbar-meta" id="topbarMeta">Loading...</div>
+      </div>
+      <div class="content">
+
+        <!-- DASHBOARD -->
+        <section id="section-dashboard">
+          <div class="stats-grid" id="statsGrid">
+            <div class="stat-card"><div class="stat-icon" style="background:rgba(14,165,233,.15);color:#0ea5e9"><i class="fas fa-users"></i></div><div><div class="stat-num" id="stat-patients">—</div><div class="stat-label">Patients</div></div></div>
+            <div class="stat-card"><div class="stat-icon" style="background:rgba(34,197,94,.15);color:#22c55e"><i class="fas fa-user-md"></i></div><div><div class="stat-num" id="stat-doctors">—</div><div class="stat-label">Doctors</div></div></div>
+            <div class="stat-card"><div class="stat-icon" style="background:rgba(168,85,247,.15);color:#a855f7"><i class="fas fa-calendar-check"></i></div><div><div class="stat-num" id="stat-appointments">—</div><div class="stat-label">Appointments</div></div></div>
+            <div class="stat-card"><div class="stat-icon" style="background:rgba(245,158,11,.15);color:#f59e0b"><i class="fas fa-hospital"></i></div><div><div class="stat-num" id="stat-hospitals">—</div><div class="stat-label">Hospitals</div></div></div>
+            <div class="stat-card"><div class="stat-icon" style="background:rgba(34,197,94,.15);color:#22c55e"><i class="fas fa-calendar-day"></i></div><div><div class="stat-num" id="stat-today">—</div><div class="stat-label">Appts Today</div></div></div>
+            <div class="stat-card"><div class="stat-icon" style="background:rgba(239,68,68,.15);color:#ef4444"><i class="fas fa-exclamation-circle"></i></div><div><div class="stat-num stat-warn" id="stat-unverified">—</div><div class="stat-label">Unverified Doctors</div></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3><i class="fas fa-history" style="color:var(--primary);margin-right:6px"></i>Recent Activity</h3></div>
+            <div id="auditPreview">
+              <div class="empty-state"><div class="spinner"></div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- DOCTORS -->
+        <section id="section-doctors" class="section-hidden">
+          <div class="panel">
+            <div class="panel-head">
+              <h3><i class="fas fa-user-md" style="color:var(--primary);margin-right:6px"></i>Doctor Management</h3>
+              <div class="panel-tools">
+                <input class="search-input" type="text" placeholder="Search doctors..." id="doctorSearch" oninput="filterDoctors()">
+                <select class="search-input" id="doctorVerifiedFilter" onchange="filterDoctors()" style="width:130px">
+                  <option value="">All</option>
+                  <option value="0">Unverified</option>
+                  <option value="1">Verified</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="loadDoctors()"><i class="fas fa-sync"></i> Refresh</button>
+              </div>
+            </div>
+            <div style="overflow-x:auto">
+              <table>
+                <thead><tr>
+                  <th>Name</th><th>Specialization</th><th>Hospital</th><th>City</th>
+                  <th>Status</th><th>Verified</th><th>Rating</th><th>Actions</th>
+                </tr></thead>
+                <tbody id="doctorsTable"><tr class="loading-row"><td colspan="8"><div class="spinner"></div> Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- PATIENTS -->
+        <section id="section-patients" class="section-hidden">
+          <div class="panel">
+            <div class="panel-head">
+              <h3><i class="fas fa-users" style="color:var(--primary);margin-right:6px"></i>Patient Management</h3>
+              <div class="panel-tools">
+                <input class="search-input" type="text" placeholder="Search patients..." id="patientSearch" oninput="debouncedPatientSearch()">
+                <button class="btn btn-primary btn-sm" onclick="loadPatients()"><i class="fas fa-sync"></i> Refresh</button>
+              </div>
+            </div>
+            <div style="overflow-x:auto">
+              <table>
+                <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>City</th><th>Gender</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+                <tbody id="patientsTable"><tr class="loading-row"><td colspan="8"><div class="spinner"></div> Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- APPOINTMENTS -->
+        <section id="section-appointments" class="section-hidden">
+          <div class="panel">
+            <div class="panel-head">
+              <h3><i class="fas fa-calendar-check" style="color:var(--primary);margin-right:6px"></i>Appointments</h3>
+              <div class="panel-tools">
+                <select class="search-input" id="apptStatusFilter" onchange="loadAppointments()" style="width:140px">
+                  <option value="">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="completed">Completed</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="loadAppointments()"><i class="fas fa-sync"></i> Refresh</button>
+              </div>
+            </div>
+            <div style="overflow-x:auto">
+              <table>
+                <thead><tr><th>ID</th><th>Patient</th><th>Doctor</th><th>Specialization</th><th>Date & Time</th><th>Status</th><th>Reason</th></tr></thead>
+                <tbody id="appointmentsTable"><tr class="loading-row"><td colspan="7"><div class="spinner"></div> Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- HOSPITALS -->
+        <section id="section-hospitals" class="section-hidden">
+          <div class="panel">
+            <div class="panel-head">
+              <h3><i class="fas fa-hospital" style="color:var(--primary);margin-right:6px"></i>Hospitals & Clinics</h3>
+              <button class="btn btn-primary btn-sm" onclick="loadHospitals()"><i class="fas fa-sync"></i> Refresh</button>
+            </div>
+            <div style="overflow-x:auto">
+              <table>
+                <thead><tr><th>Name</th><th>Type</th><th>City</th><th>State</th><th>Phone</th><th>Beds</th><th>Emergency</th></tr></thead>
+                <tbody id="hospitalsTable"><tr class="loading-row"><td colspan="7"><div class="spinner"></div> Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- REVIEWS -->
+        <section id="section-reviews" class="section-hidden">
+          <div class="panel">
+            <div class="panel-head">
+              <h3><i class="fas fa-star" style="color:var(--primary);margin-right:6px"></i>Reviews Moderation</h3>
+              <button class="btn btn-primary btn-sm" onclick="loadReviews()"><i class="fas fa-sync"></i> Refresh</button>
+            </div>
+            <div style="overflow-x:auto">
+              <table>
+                <thead><tr><th>Patient</th><th>Doctor</th><th>Rating</th><th>Review</th><th>Date</th><th>Action</th></tr></thead>
+                <tbody id="reviewsTable"><tr class="loading-row"><td colspan="6"><div class="spinner"></div> Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- AUDIT LOG -->
+        <section id="section-audit" class="section-hidden">
+          <div class="panel">
+            <div class="panel-head">
+              <h3><i class="fas fa-shield-alt" style="color:var(--primary);margin-right:6px"></i>Audit Log</h3>
+              <button class="btn btn-primary btn-sm" onclick="loadAudit()"><i class="fas fa-sync"></i> Refresh</button>
+            </div>
+            <div style="overflow-x:auto">
+              <table>
+                <thead><tr><th>Time</th><th>Admin</th><th>Action</th><th>Resource</th><th>ID</th><th>Details</th></tr></thead>
+                <tbody id="auditTable"><tr class="loading-row"><td colspan="6"><div class="spinner"></div> Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ACCOUNT -->
+        <section id="section-account" class="section-hidden">
+          <div class="panel" style="max-width:480px">
+            <div class="panel-head"><h3><i class="fas fa-key" style="color:var(--primary);margin-right:6px"></i>Change Password</h3></div>
+            <div style="padding:20px">
+              <div id="acctMsg" style="display:none;margin-bottom:14px"></div>
+              <form onsubmit="doAccountChangePassword(event)">
+                <div class="form-group"><label>Current Password</label><input type="password" id="acctCurrent" required class="search-input" style="width:100%"></div>
+                <div class="form-group"><label>New Password (min 12 chars)</label><input type="password" id="acctNew" required minlength="12" class="search-input" style="width:100%"></div>
+                <div class="form-group"><label>Confirm New Password</label><input type="password" id="acctConfirm" required minlength="12" class="search-input" style="width:100%"></div>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Update Password</button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /content -->
+    </div><!-- /main -->
+  </div><!-- /layout -->
+</div><!-- /adminApp -->
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <h3 id="confirmTitle">Confirm Action</h3>
+    <p id="confirmMsg" style="color:var(--muted);font-size:14px"></p>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal()" style="background:var(--border);color:var(--text)">Cancel</button>
+      <button class="btn btn-danger" id="confirmBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const state = { token: '', admin: null, currentSection: 'dashboard' }
+const BASE = ''  // same origin
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = sessionStorage.getItem('adminToken')
+  if (saved) {
+    state.token = saved
+    verifySession()
+  }
+})
+
+async function verifySession() {
+  try {
+    const r = await adminFetch('/api/admin/me')
+    if (r.success) {
+      state.admin = r.admin
+      enterApp()
+    } else {
+      sessionStorage.removeItem('adminToken')
+      state.token = ''
+    }
+  } catch { sessionStorage.removeItem('adminToken') }
+}
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+async function doLogin(e) {
+  e.preventDefault()
+  const btn = document.getElementById('loginBtn')
+  const errDiv = document.getElementById('loginError')
+  const email = document.getElementById('loginEmail').value.trim()
+  const password = document.getElementById('loginPwd').value
+  errDiv.style.display = 'none'
+  btn.disabled = true
+  btn.innerHTML = '<span class="spinner"></span> Signing in...'
+  try {
+    const r = await fetch(BASE + '/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    }).then(r => r.json())
+    if (r.success) {
+      state.token = r.token
+      state.admin = r.admin
+      sessionStorage.setItem('adminToken', r.token)
+      if (r.admin.mustChangePassword) {
+        document.getElementById('loginScreen').style.display = 'none'
+        document.getElementById('changePwdScreen').style.display = 'flex'
+      } else {
+        enterApp()
+      }
+    } else {
+      errDiv.textContent = r.error || 'Login failed'
+      errDiv.style.display = 'block'
+    }
+  } catch (err) {
+    errDiv.textContent = 'Network error. Please try again.'
+    errDiv.style.display = 'block'
+  } finally {
+    btn.disabled = false
+    btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In'
+  }
+}
+
+async function doChangePassword(e) {
+  e.preventDefault()
+  const errDiv = document.getElementById('cpwdError')
+  const btn = document.getElementById('cpwdBtn')
+  const cur = document.getElementById('cpwdCurrent').value
+  const nw = document.getElementById('cpwdNew').value
+  const conf = document.getElementById('cpwdConfirm').value
+  errDiv.style.display = 'none'
+  if (nw !== conf) { errDiv.textContent = 'Passwords do not match'; errDiv.style.display = 'block'; return }
+  btn.disabled = true
+  btn.innerHTML = '<span class="spinner"></span> Saving...'
+  try {
+    const r = await adminFetch('/api/admin/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: cur, newPassword: nw }) })
+    if (r.success) {
+      state.admin.mustChangePassword = false
+      document.getElementById('changePwdScreen').style.display = 'none'
+      enterApp()
+      toast('Password changed successfully', 'success')
+    } else {
+      errDiv.textContent = r.error || 'Change failed'
+      errDiv.style.display = 'block'
+    }
+  } catch { errDiv.textContent = 'Network error'; errDiv.style.display = 'block' }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-lock"></i> Set New Password' }
+}
+
+async function doLogout() {
+  await adminFetch('/api/admin/logout', { method: 'POST' }).catch(() => {})
+  sessionStorage.removeItem('adminToken')
+  state.token = ''; state.admin = null
+  document.getElementById('adminApp').style.display = 'none'
+  document.getElementById('loginScreen').style.display = 'flex'
+  document.getElementById('loginPwd').value = ''
+}
+
+// ─── ENTER APP ────────────────────────────────────────────────────────────────
+function enterApp() {
+  document.getElementById('loginScreen').style.display = 'none'
+  document.getElementById('changePwdScreen').style.display = 'none'
+  document.getElementById('adminApp').style.display = 'block'
+  document.getElementById('adminNameBadge').textContent = state.admin.name
+  document.getElementById('adminEmailBadge').textContent = state.admin.email
+  document.getElementById('adminRoleBadge').textContent = state.admin.role.toUpperCase()
+  loadDashboard()
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────────────────────────
+const sectionTitles = {
+  dashboard: 'Dashboard', doctors: 'Doctor Management', patients: 'Patient Management',
+  appointments: 'Appointments', hospitals: 'Hospitals & Clinics',
+  reviews: 'Reviews Moderation', audit: 'Audit Log', account: 'Account Settings'
+}
+function showSection(name) {
+  document.querySelectorAll('[id^="section-"]').forEach(s => s.classList.add('section-hidden'))
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'))
+  document.getElementById('section-' + name).classList.remove('section-hidden')
+  document.getElementById('nav-' + name)?.classList.add('active')
+  document.getElementById('topbarTitle').textContent = sectionTitles[name] || name
+  state.currentSection = name
+  const loaders = { doctors: loadDoctors, patients: loadPatients, appointments: loadAppointments, hospitals: loadHospitals, reviews: loadReviews, audit: loadAudit }
+  if (loaders[name]) loaders[name]()
+}
+
+// ─── FETCH HELPER ─────────────────────────────────────────────────────────────
+async function adminFetch(url, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', 'X-Admin-Token': state.token, ...((opts.headers) || {}) }
+  const r = await fetch(BASE + url, { ...opts, headers })
+  if (r.status === 401) { toast('Session expired — please log in again', 'error'); doLogout(); throw new Error('Unauthorized') }
+  return r.json()
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  document.getElementById('topbarMeta').textContent = new Date().toLocaleString('en-IN')
+  try {
+    const r = await adminFetch('/api/admin/stats')
+    if (!r.success) return
+    const s = r.stats
+    document.getElementById('stat-patients').textContent = s.totalPatients
+    document.getElementById('stat-doctors').textContent = s.totalDoctors
+    document.getElementById('stat-appointments').textContent = s.totalAppointments
+    document.getElementById('stat-hospitals').textContent = s.totalHospitals
+    document.getElementById('stat-today').textContent = s.appointmentsToday
+    document.getElementById('stat-unverified').textContent = s.unverifiedDoctors
+    const logs = r.recentActivity || []
+    document.getElementById('auditPreview').innerHTML = logs.length ? `
+      <table><thead><tr><th>Time</th><th>Admin</th><th>Action</th><th>Resource</th><th>Details</th></tr></thead>
+      <tbody>${logs.map(l => `<tr>
+        <td style="white-space:nowrap;font-size:12px">${fmtDate(l.created_at)}</td>
+        <td>${l.admin_email}</td>
+        <td><span class="badge ${actionBadge(l.action)}">${l.action}</span></td>
+        <td>${l.resource_type || '—'}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.details || ''}</td>
+      </tr>`).join('')}</tbody></table>` : '<div class="empty-state"><i class="fas fa-check-circle"></i><p>No recent activity</p></div>'
+  } catch {}
+}
+
+// ─── DOCTORS ─────────────────────────────────────────────────────────────────
+let allDoctors = []
+async function loadDoctors() {
+  document.getElementById('doctorsTable').innerHTML = '<tr class="loading-row"><td colspan="8"><div class="spinner"></div> Loading...</td></tr>'
+  try {
+    const r = await adminFetch('/api/admin/doctors?limit=200')
+    allDoctors = r.doctors || []
+    renderDoctors(allDoctors)
+  } catch { document.getElementById('doctorsTable').innerHTML = '<tr><td colspan="8" class="empty-state">Failed to load</td></tr>' }
+}
+function filterDoctors() {
+  const q = document.getElementById('doctorSearch').value.toLowerCase()
+  const v = document.getElementById('doctorVerifiedFilter').value
+  let rows = allDoctors.filter(d => {
+    const matchSearch = !q || [d.name, d.email, d.specialization, d.city].some(x => (x||'').toLowerCase().includes(q))
+    const matchV = v === '' || String(d.is_verified) === v
+    return matchSearch && matchV
+  })
+  renderDoctors(rows)
+}
+function renderDoctors(rows) {
+  const tb = document.getElementById('doctorsTable')
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fas fa-user-md"></i><p>No doctors found</p></td></tr>'; return }
+  tb.innerHTML = rows.map(d => `<tr>
+    <td><strong>${esc(d.name)}</strong><br><small style="color:var(--muted)">${esc(d.email)}</small></td>
+    <td>${esc(d.specialization)}</td>
+    <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis">${esc(d.hospital_name||'—')}</td>
+    <td>${esc(d.city||'—')}</td>
+    <td>${d.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Inactive</span>'}</td>
+    <td>${d.is_verified ? '<span class="badge badge-blue"><i class="fas fa-check"></i> Verified</span>' : '<span class="badge badge-warn">Unverified</span>'}</td>
+    <td>${d.rating ? d.rating.toFixed(1) + ' ⭐' : '—'}</td>
+    <td><div class="actions-cell">
+      <button class="btn btn-sm ${d.is_verified ? 'btn-warn' : 'btn-success'}" onclick="toggleVerify(${d.id},${d.is_verified})">${d.is_verified ? 'Unverify' : 'Verify'}</button>
+      <button class="btn btn-sm ${d.is_active ? 'btn-danger' : 'btn-success'}" onclick="toggleDoctorStatus(${d.id},${d.is_active})">${d.is_active ? 'Deactivate' : 'Activate'}</button>
+    </div></td>
+  </tr>`).join('')
+}
+async function toggleVerify(id, current) {
+  const newVal = !current
+  confirm2(`${newVal ? 'Verify' : 'Unverify'} this doctor?`, `This will ${newVal ? 'mark them as verified' : 'remove verification badge'}.`, async () => {
+    const r = await adminFetch(`/api/admin/doctors/${id}/verify`, { method: 'PUT', body: JSON.stringify({ is_verified: newVal }) })
+    if (r.success) { toast(`Doctor ${newVal ? 'verified' : 'unverified'}`, 'success'); loadDoctors() }
+    else toast(r.error, 'error')
+  })
+}
+async function toggleDoctorStatus(id, current) {
+  const newVal = !current
+  confirm2(`${newVal ? 'Activate' : 'Deactivate'} doctor?`, `This will ${newVal ? 'make them visible' : 'hide them from patients'}.`, async () => {
+    const r = await adminFetch(`/api/admin/doctors/${id}/status`, { method: 'PUT', body: JSON.stringify({ is_active: newVal }) })
+    if (r.success) { toast(`Doctor ${newVal ? 'activated' : 'deactivated'}`, 'success'); loadDoctors() }
+    else toast(r.error, 'error')
+  })
+}
+
+// ─── PATIENTS ────────────────────────────────────────────────────────────────
+async function loadPatients() {
+  const search = document.getElementById('patientSearch')?.value || ''
+  document.getElementById('patientsTable').innerHTML = '<tr class="loading-row"><td colspan="8"><div class="spinner"></div> Loading...</td></tr>'
+  try {
+    const r = await adminFetch(`/api/admin/patients?limit=100&search=${encodeURIComponent(search)}`)
+    const rows = r.patients || []
+    if (!rows.length) { document.getElementById('patientsTable').innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fas fa-users"></i><p>No patients found</p></td></tr>'; return }
+    document.getElementById('patientsTable').innerHTML = rows.map(p => `<tr>
+      <td><strong>${esc(p.name)}</strong></td>
+      <td>${esc(p.email)}</td>
+      <td>${esc(p.phone||'—')}</td>
+      <td>${esc(p.city||'—')}</td>
+      <td>${esc(p.gender||'—')}</td>
+      <td>${p.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Inactive</span>'}</td>
+      <td style="font-size:12px;white-space:nowrap">${fmtDate(p.created_at)}</td>
+      <td><button class="btn btn-sm ${p.is_active ? 'btn-danger' : 'btn-success'}" onclick="togglePatientStatus(${p.id},${p.is_active})">${p.is_active ? 'Deactivate' : 'Activate'}</button></td>
+    </tr>`).join('')
+  } catch { document.getElementById('patientsTable').innerHTML = '<tr><td colspan="8" class="empty-state">Failed to load</td></tr>' }
+}
+let patientDebounce
+function debouncedPatientSearch() { clearTimeout(patientDebounce); patientDebounce = setTimeout(loadPatients, 400) }
+async function togglePatientStatus(id, current) {
+  const newVal = !current
+  confirm2(`${newVal ? 'Activate' : 'Deactivate'} patient?`, `This will ${newVal ? 'restore' : 'suspend'} their access.`, async () => {
+    const r = await adminFetch(`/api/admin/patients/${id}/status`, { method: 'PUT', body: JSON.stringify({ is_active: newVal }) })
+    if (r.success) { toast(`Patient ${newVal ? 'activated' : 'deactivated'}`, 'success'); loadPatients() }
+    else toast(r.error, 'error')
+  })
+}
+
+// ─── APPOINTMENTS ────────────────────────────────────────────────────────────
+async function loadAppointments() {
+  const status = document.getElementById('apptStatusFilter').value
+  document.getElementById('appointmentsTable').innerHTML = '<tr class="loading-row"><td colspan="7"><div class="spinner"></div> Loading...</td></tr>'
+  try {
+    const r = await adminFetch(`/api/admin/appointments?limit=100${status ? '&status=' + status : ''}`)
+    const rows = r.appointments || []
+    if (!rows.length) { document.getElementById('appointmentsTable').innerHTML = '<tr><td colspan="7" class="empty-state"><i class="fas fa-calendar"></i><p>No appointments</p></td></tr>'; return }
+    const statusBadge = s => ({ confirmed: 'badge-blue', pending: 'badge-warn', cancelled: 'badge-red', completed: 'badge-green' }[s] || 'badge-gray')
+    document.getElementById('appointmentsTable').innerHTML = rows.map(a => `<tr>
+      <td style="font-size:12px">${esc(a.appointment_id||String(a.id))}</td>
+      <td>${esc(a.patient_name||'—')}</td>
+      <td>${esc(a.doctor_name||'—')}</td>
+      <td style="font-size:12px">${esc(a.specialization||'—')}</td>
+      <td style="white-space:nowrap;font-size:12px">${esc(a.appointment_date||'')} ${esc(a.appointment_time||'')}</td>
+      <td><span class="badge ${statusBadge(a.status)}">${a.status||'—'}</span></td>
+      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.reason||'—')}</td>
+    </tr>`).join('')
+  } catch { document.getElementById('appointmentsTable').innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load</td></tr>' }
+}
+
+// ─── HOSPITALS ────────────────────────────────────────────────────────────────
+async function loadHospitals() {
+  document.getElementById('hospitalsTable').innerHTML = '<tr class="loading-row"><td colspan="7"><div class="spinner"></div> Loading...</td></tr>'
+  try {
+    const r = await adminFetch('/api/admin/hospitals')
+    const rows = r.hospitals || []
+    if (!rows.length) { document.getElementById('hospitalsTable').innerHTML = '<tr><td colspan="7" class="empty-state"><i class="fas fa-hospital"></i><p>No hospitals</p></td></tr>'; return }
+    document.getElementById('hospitalsTable').innerHTML = rows.map(h => `<tr>
+      <td><strong>${esc(h.name||'')}</strong></td>
+      <td>${esc(h.type||h.hospital_type||'—')}</td>
+      <td>${esc(h.city||h.area||'—')}</td>
+      <td>${esc(h.state||'—')}</td>
+      <td>${esc(h.phone||h.contact_phone||'—')}</td>
+      <td>${h.total_beds||h.beds||'—'}</td>
+      <td>${h.emergency_services||h.emergency ? '<span class="badge badge-green"><i class="fas fa-check"></i> Yes</span>' : '<span class="badge badge-gray">No</span>'}</td>
+    </tr>`).join('')
+  } catch { document.getElementById('hospitalsTable').innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load</td></tr>' }
+}
+
+// ─── REVIEWS ─────────────────────────────────────────────────────────────────
+async function loadReviews() {
+  document.getElementById('reviewsTable').innerHTML = '<tr class="loading-row"><td colspan="6"><div class="spinner"></div> Loading...</td></tr>'
+  try {
+    const r = await adminFetch('/api/admin/reviews')
+    const rows = r.reviews || []
+    if (!rows.length) { document.getElementById('reviewsTable').innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fas fa-star"></i><p>No reviews</p></td></tr>'; return }
+    const stars = n => '⭐'.repeat(Math.min(5, Math.max(1, n)))
+    document.getElementById('reviewsTable').innerHTML = rows.map(rv => `<tr>
+      <td>${esc(rv.patient_name||'—')}</td>
+      <td>${esc(rv.doctor_name||'—')}</td>
+      <td>${stars(rv.rating)} <small>(${rv.rating})</small></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(rv.review_text||'—')}</td>
+      <td style="font-size:12px;white-space:nowrap">${fmtDate(rv.created_at)}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="deleteReview(${rv.id})"><i class="fas fa-trash"></i> Remove</button></td>
+    </tr>`).join('')
+  } catch { document.getElementById('reviewsTable').innerHTML = '<tr><td colspan="6" class="empty-state">Failed to load</td></tr>' }
+}
+async function deleteReview(id) {
+  confirm2('Remove this review?', 'This action cannot be undone.', async () => {
+    const r = await adminFetch(`/api/admin/reviews/${id}`, { method: 'DELETE' })
+    if (r.success) { toast('Review removed', 'success'); loadReviews() }
+    else toast(r.error, 'error')
+  })
+}
+
+// ─── AUDIT LOG ────────────────────────────────────────────────────────────────
+async function loadAudit() {
+  document.getElementById('auditTable').innerHTML = '<tr class="loading-row"><td colspan="6"><div class="spinner"></div> Loading...</td></tr>'
+  try {
+    const r = await adminFetch('/api/admin/audit-log?limit=100')
+    const rows = r.logs || []
+    if (!rows.length) { document.getElementById('auditTable').innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fas fa-shield-alt"></i><p>No audit logs</p></td></tr>'; return }
+    document.getElementById('auditTable').innerHTML = rows.map(l => `<tr>
+      <td style="font-size:12px;white-space:nowrap">${fmtDate(l.created_at)}</td>
+      <td>${esc(l.admin_email)}</td>
+      <td><span class="badge ${actionBadge(l.action)}">${esc(l.action)}</span></td>
+      <td>${esc(l.resource_type||'—')}</td>
+      <td>${esc(l.resource_id||'—')}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.details||'')}</td>
+    </tr>`).join('')
+  } catch { document.getElementById('auditTable').innerHTML = '<tr><td colspan="6" class="empty-state">Failed to load</td></tr>' }
+}
+
+// ─── ACCOUNT ─────────────────────────────────────────────────────────────────
+async function doAccountChangePassword(e) {
+  e.preventDefault()
+  const cur = document.getElementById('acctCurrent').value
+  const nw = document.getElementById('acctNew').value
+  const conf = document.getElementById('acctConfirm').value
+  const msgDiv = document.getElementById('acctMsg')
+  msgDiv.style.display = 'none'
+  if (nw !== conf) { msgDiv.textContent = 'Passwords do not match'; msgDiv.className = 'login-error'; msgDiv.style.display = 'block'; return }
+  try {
+    const r = await adminFetch('/api/admin/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: cur, newPassword: nw }) })
+    if (r.success) {
+      msgDiv.textContent = '✓ Password changed successfully'
+      msgDiv.className = ''
+      msgDiv.style.cssText = 'display:block;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);border-radius:8px;padding:10px 14px;color:#86efac;font-size:13px'
+      document.getElementById('acctCurrent').value = ''
+      document.getElementById('acctNew').value = ''
+      document.getElementById('acctConfirm').value = ''
+    } else {
+      msgDiv.textContent = r.error || 'Failed'
+      msgDiv.className = 'login-error'
+      msgDiv.style.display = 'block'
+    }
+  } catch { msgDiv.textContent = 'Network error'; msgDiv.className = 'login-error'; msgDiv.style.display = 'block' }
+}
+
+// ─── CONFIRM MODAL ────────────────────────────────────────────────────────────
+let confirmCallback = null
+function confirm2(title, msg, cb) {
+  document.getElementById('confirmTitle').textContent = title
+  document.getElementById('confirmMsg').textContent = msg
+  document.getElementById('confirmModal').classList.add('open')
+  confirmCallback = cb
+  document.getElementById('confirmBtn').onclick = async () => { closeModal(); await cb() }
+}
+function closeModal() { document.getElementById('confirmModal').classList.remove('open'); confirmCallback = null }
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+function toast(msg, type = 'info') {
+  const el = document.createElement('div')
+  el.className = `toast-item toast-${type}`
+  el.textContent = msg
+  document.getElementById('toast').appendChild(el)
+  setTimeout(() => el.remove(), 3500)
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function fmtDate(s) { if (!s) return '—'; try { return new Date(s).toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'}) } catch { return s } }
+function actionBadge(a) {
+  if (!a) return 'badge-gray'
+  if (a.includes('DELETE')) return 'badge-red'
+  if (a.includes('LOGIN') || a.includes('LOGOUT')) return 'badge-blue'
+  if (a.includes('VERIFY')) return 'badge-green'
+  if (a.includes('DEACTIVATE')) return 'badge-warn'
+  return 'badge-gray'
+}
+</script>
+</body>
+</html>

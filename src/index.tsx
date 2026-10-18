@@ -524,7 +524,7 @@ app.post('/api/auth/register/doctor', async (c) => {
 
     await c.env.DB.prepare(`
       INSERT INTO doctors (user_id, name, email, phone, specialization, experience_years, qualification, hospital_name, hospital_address, city, state, pincode, consultation_fee, bio, diseases_treated, sub_specializations, available_days, available_times, languages, is_verified, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       userId, name, email + ':' + hashedPwd, phone || '', specialization,
       experience_years || 0, qualification || '', hospital_name || '',
@@ -533,7 +533,7 @@ app.post('/api/auth/register/doctor', async (c) => {
       JSON.stringify([]), JSON.stringify([]),
       JSON.stringify(["Mon","Tue","Wed","Thu","Fri"]),
       JSON.stringify(["09:00","10:00","11:00","14:00","15:00","16:00"]),
-      JSON.stringify(["English"]), 0, 1
+      JSON.stringify(["English"])
     ).run()
 
     // Store email separately for login
@@ -1818,6 +1818,353 @@ app.post('/api/chat', async (c) => {
   } catch (e: any) {
     return c.json({ success: false, error: e.message }, 500)
   }
+})
+
+// ─── ADMIN PANEL BACKEND ─────────────────────────────────────────────────────
+
+// Helper: verify admin session token from header
+async function getAdminSession(db: D1Database, token: string) {
+  if (!token || token.length < 32) return null
+  try {
+    const session = await db.prepare(
+      `SELECT s.*, a.email, a.name, a.role, a.must_change_password, a.is_active
+       FROM admin_sessions s JOIN admin_users a ON s.admin_id = a.id
+       WHERE s.session_token = ? AND s.expires_at > datetime('now')`
+    ).bind(token).first() as any
+    if (!session || !session.is_active) return null
+    return session
+  } catch { return null }
+}
+
+// Helper: write audit log
+async function auditLog(db: D1Database, adminId: number, adminEmail: string, action: string, resourceType: string, resourceId: string, details: string, ip: string) {
+  try {
+    await db.prepare(
+      `INSERT INTO admin_audit_log (admin_id, admin_email, action, resource_type, resource_id, details, ip_address)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(adminId, adminEmail, action, resourceType, resourceId, details.substring(0, 500), ip).run()
+  } catch {}
+}
+
+// POST /api/admin/login
+app.post('/api/admin/login', async (c) => {
+  const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown'
+  try {
+    const { email, password } = await c.req.json()
+    if (!email || !password) return c.json({ success: false, error: 'Email and password required' }, 400)
+
+    // Rate limit: max 5 attempts per IP in 15 minutes
+    const recentAttempts = await c.env.DB.prepare(
+      `SELECT COUNT(*) as cnt FROM admin_login_attempts WHERE ip_address = ? AND attempt_at > datetime('now', '-15 minutes')`
+    ).bind(ip).first() as any
+    if ((recentAttempts?.cnt || 0) >= 5) {
+      return c.json({ success: false, error: 'Too many login attempts. Please wait 15 minutes.' }, 429)
+    }
+
+    // Record attempt
+    await c.env.DB.prepare('INSERT INTO admin_login_attempts (ip_address) VALUES (?)').bind(ip).run()
+
+    // Find admin by email only (no public registration — admin table is seeded)
+    const admin = await c.env.DB.prepare('SELECT * FROM admin_users WHERE email = ? AND is_active = 1').bind(email).first() as any
+    if (!admin) {
+      return c.json({ success: false, error: 'Invalid credentials' }, 401)
+    }
+
+    // Check account lock
+    if (admin.locked_until) {
+      const lockedUntil = new Date(admin.locked_until)
+      if (lockedUntil > new Date()) {
+        const remaining = Math.ceil((lockedUntil.getTime() - Date.now()) / 60000)
+        return c.json({ success: false, error: `Account locked. Try again in ${remaining} minutes.` }, 401)
+      }
+    }
+
+    // Verify password using same hashPassword function
+    const inputHash = hashPassword(password)
+    if (admin.password_hash !== inputHash) {
+      const newFails = (admin.failed_attempts || 0) + 1
+      if (newFails >= 5) {
+        const lockUntil = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+        await c.env.DB.prepare('UPDATE admin_users SET failed_attempts = ?, locked_until = ? WHERE id = ?')
+          .bind(newFails, lockUntil, admin.id).run()
+        return c.json({ success: false, error: 'Account locked for 30 minutes after too many failed attempts.' }, 401)
+      }
+      await c.env.DB.prepare('UPDATE admin_users SET failed_attempts = ? WHERE id = ?').bind(newFails, admin.id).run()
+      return c.json({ success: false, error: 'Invalid credentials' }, 401)
+    }
+
+    // Reset failed attempts
+    await c.env.DB.prepare('UPDATE admin_users SET failed_attempts = 0, locked_until = NULL, last_login = datetime("now") WHERE id = ?').bind(admin.id).run()
+
+    // Create admin session (8 hours)
+    const token = generateSessionToken()
+    const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
+    await c.env.DB.prepare('INSERT INTO admin_sessions (session_token, admin_id, expires_at, ip_address) VALUES (?, ?, ?, ?)').bind(token, admin.id, expiresAt, ip).run()
+
+    await auditLog(c.env.DB, admin.id, admin.email, 'LOGIN', 'admin_user', String(admin.id), 'Admin login', ip)
+
+    return c.json({
+      success: true, token,
+      admin: { id: admin.id, email: admin.email, name: admin.name, role: admin.role, mustChangePassword: !!admin.must_change_password }
+    })
+  } catch (e: any) {
+    return c.json({ success: false, error: 'Login failed' }, 500)
+  }
+})
+
+// POST /api/admin/logout
+app.post('/api/admin/logout', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (session) {
+    await auditLog(c.env.DB, session.admin_id, session.email, 'LOGOUT', 'admin_user', String(session.admin_id), 'Admin logout', 'system')
+    await c.env.DB.prepare('DELETE FROM admin_sessions WHERE session_token = ?').bind(token).run()
+  }
+  return c.json({ success: true })
+})
+
+// POST /api/admin/change-password (required after first login)
+app.post('/api/admin/change-password', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  try {
+    const { currentPassword, newPassword } = await c.req.json()
+    if (!newPassword || newPassword.length < 12) return c.json({ success: false, error: 'New password must be at least 12 characters' }, 400)
+    const admin = await c.env.DB.prepare('SELECT * FROM admin_users WHERE id = ?').bind(session.admin_id).first() as any
+    if (hashPassword(currentPassword) !== admin.password_hash) return c.json({ success: false, error: 'Current password incorrect' }, 401)
+    if (newPassword === currentPassword) return c.json({ success: false, error: 'New password must differ from current password' }, 400)
+    const newHash = hashPassword(newPassword)
+    await c.env.DB.prepare('UPDATE admin_users SET password_hash = ?, must_change_password = 0, updated_at = datetime("now") WHERE id = ?').bind(newHash, session.admin_id).run()
+    await auditLog(c.env.DB, session.admin_id, session.email, 'CHANGE_PASSWORD', 'admin_user', String(session.admin_id), 'Password changed', ip)
+    return c.json({ success: true, message: 'Password changed successfully' })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// GET /api/admin/stats — overview statistics
+app.get('/api/admin/stats', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  try {
+    const [patients, doctors, appointments, hospitals, reviews, apptToday] = await Promise.all([
+      c.env.DB.prepare('SELECT COUNT(*) as cnt FROM patients WHERE is_active = 1').first() as any,
+      c.env.DB.prepare('SELECT COUNT(*) as cnt FROM doctors WHERE is_active = 1').first() as any,
+      c.env.DB.prepare('SELECT COUNT(*) as cnt FROM appointments').first() as any,
+      c.env.DB.prepare('SELECT COUNT(*) as cnt FROM hospitals').first() as any,
+      c.env.DB.prepare('SELECT COUNT(*) as cnt FROM reviews').first() as any,
+      c.env.DB.prepare("SELECT COUNT(*) as cnt FROM appointments WHERE appointment_date = date('now')").first() as any,
+    ])
+    const unverifiedDoctors = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM doctors WHERE is_verified = 0 AND is_active = 1').first() as any
+    const recentAudit = await c.env.DB.prepare('SELECT * FROM admin_audit_log ORDER BY created_at DESC LIMIT 10').all()
+    return c.json({
+      success: true,
+      stats: {
+        totalPatients: patients?.cnt || 0,
+        totalDoctors: doctors?.cnt || 0,
+        totalAppointments: appointments?.cnt || 0,
+        totalHospitals: hospitals?.cnt || 0,
+        totalReviews: reviews?.cnt || 0,
+        appointmentsToday: apptToday?.cnt || 0,
+        unverifiedDoctors: unverifiedDoctors?.cnt || 0,
+      },
+      recentActivity: recentAudit.results || []
+    })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// GET /api/admin/patients — list all patients (no passwords, no medical secrets)
+app.get('/api/admin/patients', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  try {
+    const { search = '', limit = '50', offset = '0' } = c.req.query()
+    let q = 'SELECT id, name, email, phone, city, state, gender, blood_group, is_active, created_at FROM patients'
+    const params: any[] = []
+    if (search) { q += ' WHERE name LIKE ? OR email LIKE ? OR phone LIKE ?'; params.push(`%${search}%`, `%${search}%`, `%${search}%`) }
+    q += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+    params.push(Number(limit), Number(offset))
+    const { results } = await c.env.DB.prepare(q).bind(...params).all()
+    return c.json({ success: true, patients: results })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// PUT /api/admin/patients/:id/status — activate/deactivate patient
+app.put('/api/admin/patients/:id/status', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  try {
+    const id = c.req.param('id')
+    const { is_active } = await c.req.json()
+    await c.env.DB.prepare('UPDATE patients SET is_active = ?, updated_at = datetime("now") WHERE id = ?').bind(is_active ? 1 : 0, id).run()
+    await auditLog(c.env.DB, session.admin_id, session.email, is_active ? 'ACTIVATE_PATIENT' : 'DEACTIVATE_PATIENT', 'patient', id, `Patient ${id} ${is_active ? 'activated' : 'deactivated'}`, ip)
+    return c.json({ success: true })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// GET /api/admin/doctors — list all doctors
+app.get('/api/admin/doctors', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  try {
+    const { search = '', verified = '', limit = '50', offset = '0' } = c.req.query()
+    let q = 'SELECT id, name, email, phone, specialization, hospital_name, city, state, is_verified, is_active, rating, total_ratings, consultation_fee, experience_years, qualification, created_at FROM doctors'
+    const conditions: string[] = []
+    const params: any[] = []
+    if (search) { conditions.push('(name LIKE ? OR email LIKE ? OR specialization LIKE ?)'); params.push(`%${search}%`, `%${search}%`, `%${search}%`) }
+    if (verified !== '') { conditions.push('is_verified = ?'); params.push(Number(verified)) }
+    if (conditions.length) q += ' WHERE ' + conditions.join(' AND ')
+    q += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+    params.push(Number(limit), Number(offset))
+    const { results } = await c.env.DB.prepare(q).bind(...params).all()
+    return c.json({ success: true, doctors: results })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// PUT /api/admin/doctors/:id/verify — verify/unverify doctor
+app.put('/api/admin/doctors/:id/verify', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  try {
+    const id = c.req.param('id')
+    const { is_verified } = await c.req.json()
+    await c.env.DB.prepare('UPDATE doctors SET is_verified = ?, updated_at = datetime("now") WHERE id = ?').bind(is_verified ? 1 : 0, id).run()
+    await auditLog(c.env.DB, session.admin_id, session.email, is_verified ? 'VERIFY_DOCTOR' : 'UNVERIFY_DOCTOR', 'doctor', id, `Doctor ${id} verification set to ${is_verified}`, ip)
+    return c.json({ success: true })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// PUT /api/admin/doctors/:id/status — activate/deactivate doctor
+app.put('/api/admin/doctors/:id/status', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  try {
+    const id = c.req.param('id')
+    const { is_active } = await c.req.json()
+    await c.env.DB.prepare('UPDATE doctors SET is_active = ?, updated_at = datetime("now") WHERE id = ?').bind(is_active ? 1 : 0, id).run()
+    await auditLog(c.env.DB, session.admin_id, session.email, is_active ? 'ACTIVATE_DOCTOR' : 'DEACTIVATE_DOCTOR', 'doctor', id, `Doctor ${id} ${is_active ? 'activated' : 'deactivated'}`, ip)
+    return c.json({ success: true })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// DELETE /api/admin/doctors/:id — permanently remove doctor (requires confirmation)
+app.delete('/api/admin/doctors/:id', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  if (session.role !== 'superadmin') return c.json({ success: false, error: 'Insufficient permissions' }, 403)
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  try {
+    const id = c.req.param('id')
+    const { confirm } = await c.req.json()
+    if (confirm !== 'DELETE') return c.json({ success: false, error: 'Confirmation required: send confirm: "DELETE"' }, 400)
+    const doc = await c.env.DB.prepare('SELECT name, email FROM doctors WHERE id = ?').bind(id).first() as any
+    await c.env.DB.prepare('UPDATE doctors SET is_active = 0, updated_at = datetime("now") WHERE id = ?').bind(id).run()
+    await auditLog(c.env.DB, session.admin_id, session.email, 'DELETE_DOCTOR', 'doctor', id, `Soft-deleted doctor: ${doc?.name} (${doc?.email})`, ip)
+    return c.json({ success: true })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// GET /api/admin/appointments — list all appointments
+app.get('/api/admin/appointments', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  try {
+    const { status = '', limit = '50', offset = '0' } = c.req.query()
+    let q = `SELECT a.id, a.appointment_id, a.appointment_date, a.appointment_time, a.status, a.reason,
+      d.name as doctor_name, d.specialization, p.name as patient_name, a.created_at
+      FROM appointments a
+      LEFT JOIN doctors d ON a.doctor_id = d.id
+      LEFT JOIN patients p ON a.patient_id = p.id`
+    const params: any[] = []
+    if (status) { q += ' WHERE a.status = ?'; params.push(status) }
+    q += ' ORDER BY a.created_at DESC LIMIT ? OFFSET ?'
+    params.push(Number(limit), Number(offset))
+    const { results } = await c.env.DB.prepare(q).bind(...params).all()
+    return c.json({ success: true, appointments: results })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// GET /api/admin/hospitals — list all hospitals (uses existing table)
+app.get('/api/admin/hospitals', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  try {
+    const { results } = await c.env.DB.prepare('SELECT * FROM hospitals ORDER BY created_at DESC').all()
+    return c.json({ success: true, hospitals: results })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// GET /api/admin/audit-log — recent audit trail
+app.get('/api/admin/audit-log', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  try {
+    const { limit = '50', offset = '0' } = c.req.query()
+    const { results } = await c.env.DB.prepare('SELECT * FROM admin_audit_log ORDER BY created_at DESC LIMIT ? OFFSET ?').bind(Number(limit), Number(offset)).all()
+    return c.json({ success: true, logs: results })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// GET /api/admin/reviews — all reviews (for moderation)
+app.get('/api/admin/reviews', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT r.id, r.rating, r.review_text, r.created_at,
+        d.name as doctor_name, p.name as patient_name
+      FROM reviews r LEFT JOIN doctors d ON r.doctor_id = d.id LEFT JOIN patients p ON r.patient_id = p.id
+      ORDER BY r.created_at DESC LIMIT 100`).all()
+    return c.json({ success: true, reviews: results })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// DELETE /api/admin/reviews/:id — remove inappropriate review
+app.delete('/api/admin/reviews/:id', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  try {
+    const id = c.req.param('id')
+    await c.env.DB.prepare('DELETE FROM reviews WHERE id = ?').bind(id).run()
+    await auditLog(c.env.DB, session.admin_id, session.email, 'DELETE_REVIEW', 'review', id, `Deleted review ${id}`, ip)
+    return c.json({ success: true })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// GET /api/admin/me — verify session and return admin info
+app.get('/api/admin/me', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  return c.json({ success: true, admin: { id: session.admin_id, email: session.email, name: session.name, role: session.role, mustChangePassword: !!session.must_change_password } })
 })
 
 // ─── STATIC FILES ─────────────────────────────────────────────────────────────
