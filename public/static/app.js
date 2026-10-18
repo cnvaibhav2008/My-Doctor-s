@@ -1052,31 +1052,38 @@ function displayAIResults(analysis, doctors) {
   resultsDiv.style.display = 'block';
   resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-  // Urgency
+  // Urgency alert
   const urgencyMessages = {
-    emergency: { text: '🚨 EMERGENCY: Please call 112 or go to the nearest hospital immediately! Do not delay.', cls: 'urgency-emergency' },
-    high: { text: '⚠️ High Priority: These symptoms need prompt medical attention. Please consult a doctor today.', cls: 'urgency-high' },
-    moderate: { text: '📋 Moderate: Please schedule an appointment with a doctor soon.', cls: 'urgency-moderate' },
-    low: { text: '✅ Low Priority: Monitor your symptoms. Consult a doctor if they persist or worsen.', cls: 'urgency-low' }
+    emergency: { text: '🚨 EMERGENCY: Call 112 or go to the nearest hospital immediately! Do not wait.', cls: 'urgency-emergency' },
+    high:      { text: '⚠️ High Priority: These symptoms need prompt medical attention. Please see a doctor today.', cls: 'urgency-high' },
+    moderate:  { text: '📋 Moderate: Please schedule an appointment with a doctor soon.', cls: 'urgency-moderate' },
+    low:       { text: '✅ Low Priority: Monitor your symptoms. See a doctor if they persist or worsen.', cls: 'urgency-low' }
   };
-  const urg = urgencyMessages[analysis.urgencyLevel] || urgencyMessages.low;
-  $('urgencyAlert').className = `urgency-alert ${urg.cls}`;
-  $('urgencyAlert').innerHTML = urg.text;
+  // Override urgency text if Gemini gave a specific emergency warning
+  let urgText = (urgencyMessages[analysis.urgencyLevel] || urgencyMessages.low).text;
+  let urgCls  = (urgencyMessages[analysis.urgencyLevel] || urgencyMessages.low).cls;
+  if (analysis.emergencyWarning) {
+    urgText = '🚨 ' + analysis.emergencyWarning;
+    urgCls  = 'urgency-emergency';
+  }
+  $('urgencyAlert').className = `urgency-alert ${urgCls}`;
+  $('urgencyAlert').innerHTML = urgText;
 
   // Predictions
-  if (analysis.predictions.length === 0) {
-    $('aiPredictions').innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><h3>No specific condition matched</h3><p>Try adding more detailed symptoms or consult a General Physician</p></div>';
+  let html = `
+    <div class="ai-disclaimer-note">
+      <i class="fas fa-info-circle"></i>
+      <strong>Educational Information Only</strong> — These are possible conditions based on symptom patterns.
+      Percentages are <em>symptom-match scores</em>, not diagnostic accuracy.
+      This is <strong>NOT</strong> a medical diagnosis. Always consult a qualified doctor.
+    </div>`;
+
+  if (!analysis.predictions || analysis.predictions.length === 0) {
+    html += '<div class="empty-state"><i class="fas fa-search"></i><h3>No specific condition matched</h3><p>Try adding more detailed symptoms or consult a General Physician</p></div>';
   } else {
-    $('aiPredictions').innerHTML = `
-      <div class="ai-disclaimer-note">
-        <i class="fas fa-info-circle"></i>
-        <strong>Educational Information Only</strong> — These are possible conditions based on symptom patterns.
-        The percentages shown are <em>symptom match scores</em>, not diagnostic accuracy.
-        This is NOT a medical diagnosis. Please consult a qualified doctor for personal medical advice.
-      </div>
-    ` + analysis.predictions.map(p => `
+    html += analysis.predictions.map(p => `
       <div class="prediction-card">
-        <div>
+        <div style="flex:1;min-width:0">
           <div class="prediction-disease">${p.disease}</div>
           <div class="prediction-desc">${p.description}</div>
           <span class="prediction-spec"><i class="fas fa-user-md"></i> ${p.specialization}</span>
@@ -1086,11 +1093,26 @@ function displayAIResults(analysis, doctors) {
           <div class="confidence-label">Match</div>
           <div class="confidence-bar"><div class="confidence-fill" style="width:${p.confidence}%"></div></div>
         </div>
-      </div>
-    `).join('');
+      </div>`).join('');
   }
 
-  // Matched Doctors
+  // Gemini-provided extra guidance
+  if (analysis.generalAdvice) {
+    html += `<div class="ai-extra-card"><i class="fas fa-lightbulb" style="color:#F59E0B"></i><div>
+      <strong>General Advice</strong><p>${analysis.generalAdvice}</p></div></div>`;
+  }
+  if (analysis.warningSigns) {
+    html += `<div class="ai-extra-card ai-warning-card"><i class="fas fa-exclamation-triangle" style="color:#EF4444"></i><div>
+      <strong>Seek Immediate Care If</strong><p>${analysis.warningSigns}</p></div></div>`;
+  }
+  if (analysis.followUpQuestions) {
+    html += `<div class="ai-extra-card"><i class="fas fa-question-circle" style="color:#6366F1"></i><div>
+      <strong>Your Doctor May Ask</strong><p>${analysis.followUpQuestions}</p></div></div>`;
+  }
+
+  $('aiPredictions').innerHTML = html;
+
+  // Matched Doctors — only show if real matches exist
   if (doctors && doctors.length > 0) {
     $('matchedDoctorsSection').style.display = '';
     $('matchedDoctors').innerHTML = doctors.slice(0, 4).map(renderDoctorCard).join('');

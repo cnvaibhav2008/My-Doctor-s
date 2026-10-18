@@ -3236,3 +3236,24 @@ textarea {
     font-size: 0.7rem;
   }
 }
+
+/* ── AI Extra Info Cards (Gemini advice / warning signs / follow-up) ── */
+.ai-extra-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-top: 10px;
+  font-size: 0.84rem;
+}
+.ai-extra-card i { font-size: 1.1rem; margin-top: 2px; flex-shrink: 0; }
+.ai-extra-card div { flex: 1; }
+.ai-extra-card strong { display: block; font-weight: 700; color: var(--dark); margin-bottom: 4px; }
+.ai-extra-card p { margin: 0; color: var(--mid); line-height: 1.55; }
+.ai-warning-card { border-color: #FECACA; background: #FFF5F5; }
+[data-theme="dark"] .ai-warning-card { background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.2); }
+[data-theme="dark"] .ai-extra-card strong { color: var(--text-primary); }
+[data-theme="dark"] .ai-extra-card p { color: var(--text-muted); }

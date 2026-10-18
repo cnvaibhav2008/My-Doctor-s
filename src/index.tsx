@@ -875,12 +875,98 @@ app.put('/api/patients/profile', async (c) => {
 })
 
 // ─── AI ROUTES ────────────────────────────────────────────────────────────────
+// Maps Gemini-returned specialization labels → DB-exact values
+const SPEC_NORMALIZER: Record<string, string> = {
+  'general physician': 'General Medicine',
+  'general practice': 'General Medicine',
+  'internal medicine': 'General Medicine',
+  'family medicine': 'General Medicine',
+  'gp': 'General Medicine',
+  'cardiologist': 'Cardiologist',
+  'cardiology': 'Cardiologist',
+  'neurologist': 'Neurologist',
+  'neurology': 'Neurologist',
+  'neurosurgeon': 'Neurosurgeon',
+  'neurosurgery': 'Neurosurgeon',
+  'gastroenterologist': 'Gastroenterologist',
+  'gastroenterology': 'Gastroenterologist',
+  'pulmonologist': 'Pulmonologist',
+  'pulmonology': 'Pulmonologist',
+  'respirologist': 'Pulmonologist',
+  'orthopedic': 'Orthopaedic',
+  'orthopaedic': 'Orthopaedic',
+  'orthopedic surgeon': 'Orthopaedic',
+  'orthopaedic surgeon': 'Orthopaedic',
+  'pediatrician': 'Pediatrician',
+  'pediatrics': 'Pediatrician',
+  'paediatrician': 'Pediatrician',
+  'gynecologist': 'Gynecologist',
+  'gynaecologist': 'Gynecologist',
+  'obstetrician': 'Gynecologist',
+  'obs & gynae': 'Gynecologist',
+  'psychiatrist': 'Psychiatrist',
+  'psychiatry': 'Psychiatrist',
+  'dermatologist': 'Dermatologist',
+  'dermatology': 'Dermatologist',
+  'nephrologist': 'Nephrologist',
+  'nephrology': 'Nephrologist',
+  'urologist': 'Urologist',
+  'urology': 'Urologist',
+  'oncologist': 'Oncologist',
+  'oncology': 'Oncologist',
+  'ophthalmologist': 'Ophthalmologist',
+  'ophthalmology': 'Ophthalmologist',
+  'ent': 'ENT',
+  'otolaryngologist': 'ENT',
+  'ear nose and throat': 'ENT',
+  'endocrinologist': 'General Medicine',
+  'rheumatologist': 'General Medicine',
+  'hematologist': 'General Medicine',
+  'immunologist': 'General Medicine',
+  'infectious disease': 'General Medicine',
+}
+function normalizeSpec(s: string): string {
+  return SPEC_NORMALIZER[s.toLowerCase().trim()] || s
+}
+
+// ─── AI SYMPTOM CHECKER — GEMINI POWERED ────────────────────────────────────
+const SYMPTOM_CHECKER_SYSTEM = `You are MedAssist, a medical information AI for MyDoctor's, an Indian healthcare platform.
+Given a patient's symptoms (and optional body region), provide a structured health information response.
+
+STRICT RULES:
+- NEVER diagnose. NEVER prescribe medicines or dosages.
+- Always recommend consulting a qualified doctor.
+- For any emergency symptoms (chest pain, difficulty breathing, stroke signs, severe bleeding, loss of consciousness), lead with an urgent emergency warning.
+- Confidence percentages represent symptom-pattern match likelihood, NOT diagnostic certainty.
+- Keep language simple and understandable for Indian patients.
+
+Respond ONLY with valid JSON matching this exact structure:
+{
+  "urgencyLevel": "emergency" | "high" | "moderate" | "low",
+  "emergencyWarning": "string or empty string",
+  "predictions": [
+    {
+      "disease": "Condition Name",
+      "confidence": 75,
+      "specialization": "Doctor Specialization",
+      "description": "Brief description of this condition and why these symptoms may relate to it",
+      "urgency": "emergency" | "high" | "moderate" | "low"
+    }
+  ],
+  "recommendedSpecializations": ["Specialization1", "Specialization2"],
+  "generalAdvice": "Practical, safe health advice for these symptoms",
+  "warningSigns": "Specific warning signs that should trigger immediate medical attention",
+  "followUpQuestions": "1-2 questions a doctor might ask to better understand these symptoms"
+}
+
+Provide 2-4 plausible conditions. Confidence must be between 20 and 90. Do not output anything outside the JSON object.`
+
 app.post('/api/ai/analyze-symptoms', async (c) => {
   try {
     const { symptoms, bodyPart, disease } = await c.req.json()
 
     if (disease) {
-      // Find doctors for specific disease
+      // Find doctors for specific disease (unchanged)
       const { results } = await c.env.DB.prepare(
         `SELECT * FROM doctors WHERE is_active = 1 AND (diseases_treated LIKE ? OR specialization LIKE ?) ORDER BY rating DESC LIMIT 10`
       ).bind(`%${disease}%`, `%${disease}%`).all()
@@ -902,15 +988,116 @@ app.post('/api/ai/analyze-symptoms', async (c) => {
       return c.json({ success: false, error: 'Symptoms required' }, 400)
     }
 
-    const analysis = analyzeSymptoms(symptoms, bodyPart)
+    const apiKey = c.env.GEMINI_API_KEY
+    if (!apiKey) {
+      // Fallback to local analysis when no API key configured
+      const analysis = analyzeSymptoms(symptoms, bodyPart)
+      let matchedDoctors: any[] = []
+      if (analysis.recommendedSpecializations.length > 0) {
+        const specs = analysis.recommendedSpecializations.slice(0, 3)
+        const placeholders = specs.map(() => '?').join(', ')
+        const { results } = await c.env.DB.prepare(
+          `SELECT * FROM doctors WHERE is_active = 1 AND specialization IN (${placeholders}) ORDER BY rating DESC LIMIT 8`
+        ).bind(...specs).all()
+        matchedDoctors = results.map((d: any) => ({ ...d, sub_specializations: JSON.parse(d.sub_specializations || '[]'), user_id: undefined }))
+      }
+      return c.json({ success: true, analysis, matchedDoctors, source: 'local' })
+    }
 
-    // Fetch matching doctors
+    // Build Gemini prompt
+    const bodyPartText = bodyPart ? ` The patient indicates pain/discomfort in the ${bodyPart} region.` : ''
+    const userPrompt = `Patient symptoms: ${symptoms.join(', ')}.${bodyPartText}
+
+Provide a structured health information response in the exact JSON format specified.`
+
+    const requestBody = {
+      system_instruction: { parts: [{ text: SYMPTOM_CHECKER_SYSTEM }] },
+      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 1500,
+        responseMimeType: 'application/json'
+      },
+      safetySettings: [
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' }
+      ]
+    }
+
+    let geminiText = ''
+    try {
+      geminiText = await callGeminiModel(apiKey, GEMINI_MODELS[0], requestBody)
+    } catch (e1: any) {
+      // Try second model
+      try {
+        geminiText = await callGeminiModel(apiKey, GEMINI_MODELS[1], requestBody)
+      } catch (e2: any) {
+        // Both models failed — fall back to local analysis
+        console.error('Gemini symptom check failed, falling back to local:', e2.message)
+        const analysis = analyzeSymptoms(symptoms, bodyPart)
+        let matchedDoctors: any[] = []
+        if (analysis.recommendedSpecializations.length > 0) {
+          const specs = analysis.recommendedSpecializations.slice(0, 3)
+          const placeholders = specs.map(() => '?').join(', ')
+          const { results } = await c.env.DB.prepare(
+            `SELECT * FROM doctors WHERE is_active = 1 AND specialization IN (${placeholders}) ORDER BY rating DESC LIMIT 8`
+          ).bind(...specs).all()
+          matchedDoctors = results.map((d: any) => ({ ...d, sub_specializations: JSON.parse(d.sub_specializations || '[]'), user_id: undefined }))
+        }
+        return c.json({ success: true, analysis, matchedDoctors, source: 'local' })
+      }
+    }
+
+    // Parse Gemini JSON response
+    let geminiAnalysis: any
+    try {
+      // Strip markdown code fences if present
+      const cleaned = geminiText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+      geminiAnalysis = JSON.parse(cleaned)
+    } catch (parseErr) {
+      console.error('Gemini response parse error, falling back to local')
+      const analysis = analyzeSymptoms(symptoms, bodyPart)
+      let matchedDoctors: any[] = []
+      if (analysis.recommendedSpecializations.length > 0) {
+        const specs = analysis.recommendedSpecializations.slice(0, 3)
+        const placeholders = specs.map(() => '?').join(', ')
+        const { results } = await c.env.DB.prepare(
+          `SELECT * FROM doctors WHERE is_active = 1 AND specialization IN (${placeholders}) ORDER BY rating DESC LIMIT 8`
+        ).bind(...specs).all()
+        matchedDoctors = results.map((d: any) => ({ ...d, sub_specializations: JSON.parse(d.sub_specializations || '[]'), user_id: undefined }))
+      }
+      return c.json({ success: true, analysis, matchedDoctors, source: 'local' })
+    }
+
+    // Normalise predictions — map Gemini specialization labels to DB-exact values
+    const predictions = (geminiAnalysis.predictions || []).map((p: any) => ({
+      disease: p.disease || 'Unknown Condition',
+      confidence: Math.min(90, Math.max(20, Number(p.confidence) || 50)),
+      specialization: normalizeSpec(p.specialization || 'General Medicine'),
+      description: p.description || '',
+      urgency: p.urgency || 'moderate'
+    }))
+
+    const rawSpecs: string[] = geminiAnalysis.recommendedSpecializations || predictions.map((p: any) => p.specialization)
+    const analysis = {
+      predictions,
+      recommendedSpecializations: [...new Set(rawSpecs.map(normalizeSpec))],
+      urgencyLevel: geminiAnalysis.urgencyLevel || 'moderate',
+      emergencyWarning: geminiAnalysis.emergencyWarning || '',
+      generalAdvice: geminiAnalysis.generalAdvice || '',
+      warningSigns: geminiAnalysis.warningSigns || '',
+      followUpQuestions: geminiAnalysis.followUpQuestions || ''
+    }
+
+    // Fetch matching doctors from DB for recommended specializations
     let matchedDoctors: any[] = []
     if (analysis.recommendedSpecializations.length > 0) {
-      const specs = analysis.recommendedSpecializations.slice(0, 3)
+      const specs = (analysis.recommendedSpecializations as string[]).slice(0, 3)
       const placeholders = specs.map(() => '?').join(', ')
       const { results } = await c.env.DB.prepare(
-        `SELECT * FROM doctors WHERE is_active = 1 AND specialization IN (${placeholders}) ORDER BY rating DESC LIMIT 15`
+        `SELECT * FROM doctors WHERE is_active = 1 AND specialization IN (${placeholders}) ORDER BY rating DESC LIMIT 8`
       ).bind(...specs).all()
 
       matchedDoctors = results.map((d: any) => ({
@@ -924,9 +1111,9 @@ app.post('/api/ai/analyze-symptoms', async (c) => {
       }))
     }
 
-    return c.json({ success: true, analysis, matchedDoctors })
+    return c.json({ success: true, analysis, matchedDoctors, source: 'gemini' })
   } catch (e: any) {
-    return c.json({ success: false, error: e.message }, 500)
+    return c.json({ success: false, error: 'Analysis failed. Please try again.' }, 500)
   }
 })
 
@@ -1449,10 +1636,8 @@ FORMATTING:
 
 // Model priority list — tries each in order until one succeeds
 const GEMINI_MODELS = [
-  'gemini-3-flash-preview',
-  'gemini-3.1-flash-lite-preview',
   'gemini-flash-lite-latest',
-  'gemini-2.5-flash-lite'
+  'gemini-3-flash-preview'
 ]
 
 async function callGeminiModel(apiKey: string, model: string, requestBody: any): Promise<string> {
