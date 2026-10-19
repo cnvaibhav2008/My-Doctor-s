@@ -276,6 +276,7 @@ select.search-input{padding:7px 12px}
                   <option value="0">Unverified</option>
                   <option value="1">Verified</option>
                 </select>
+                <button class="btn btn-success btn-sm" onclick="openDoctorForm()"><i class="fas fa-plus"></i> Add Doctor</button>
                 <button class="btn btn-primary btn-sm" onclick="loadDoctors()"><i class="fas fa-sync"></i> Refresh</button>
               </div>
             </div>
@@ -298,6 +299,7 @@ select.search-input{padding:7px 12px}
               <h3><i class="fas fa-users" style="color:var(--primary);margin-right:6px"></i>Patient Management</h3>
               <div class="panel-tools">
                 <input class="search-input" type="text" placeholder="Search patients..." id="patientSearch" oninput="debouncedPatientSearch()">
+                <button class="btn btn-success btn-sm" onclick="openPatientForm()"><i class="fas fa-plus"></i> Add Patient</button>
                 <button class="btn btn-primary btn-sm" onclick="loadPatients()"><i class="fas fa-sync"></i> Refresh</button>
               </div>
             </div>
@@ -328,8 +330,8 @@ select.search-input{padding:7px 12px}
             </div>
             <div style="overflow-x:auto">
               <table>
-                <thead><tr><th>ID</th><th>Patient</th><th>Doctor</th><th>Specialization</th><th>Date & Time</th><th>Status</th><th>Reason</th></tr></thead>
-                <tbody id="appointmentsTable"><tr class="loading-row"><td colspan="7"><div class="spinner"></div> Loading...</td></tr></tbody>
+                <thead><tr><th>ID</th><th>Patient</th><th>Doctor</th><th>Specialization</th><th>Date & Time</th><th>Status</th><th>Reason</th><th>Actions</th></tr></thead>
+                <tbody id="appointmentsTable"><tr class="loading-row"><td colspan="8"><div class="spinner"></div> Loading...</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -404,6 +406,72 @@ select.search-input{padding:7px 12px}
   </div><!-- /layout -->
 </div><!-- /adminApp -->
 
+<!-- DOCTOR FORM MODAL -->
+<div class="modal-overlay" id="doctorModal">
+  <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto">
+    <h3 id="doctorModalTitle">Add Doctor</h3>
+    <form id="doctorForm" onsubmit="submitDoctorForm(event)">
+      <input type="hidden" id="docId">
+      <div class="form-group"><label>Full Name *</label><input class="search-input" style="width:100%" id="docName" required></div>
+      <div class="form-group"><label>Email *</label><input class="search-input" style="width:100%" type="email" id="docEmail" required></div>
+      <div class="form-group" id="docPwdGroup"><label>Password <span id="docPwdHint">*</span></label><input class="search-input" style="width:100%" type="password" id="docPassword"></div>
+      <div class="form-group"><label>Phone</label><input class="search-input" style="width:100%" id="docPhone"></div>
+      <div class="form-group"><label>Specialization *</label><input class="search-input" style="width:100%" id="docSpecialization" required></div>
+      <div class="filter-row">
+        <div class="form-group" style="flex:1"><label>Experience (years)</label><input class="search-input" style="width:100%" type="number" min="0" id="docExperience"></div>
+        <div class="form-group" style="flex:1"><label>Consultation Fee</label><input class="search-input" style="width:100%" type="number" min="0" id="docFee"></div>
+      </div>
+      <div class="form-group"><label>Qualification</label><input class="search-input" style="width:100%" id="docQualification"></div>
+      <div class="form-group"><label>Hospital Name</label><input class="search-input" style="width:100%" id="docHospital"></div>
+      <div class="filter-row">
+        <div class="form-group" style="flex:1"><label>City</label><input class="search-input" style="width:100%" id="docCity"></div>
+        <div class="form-group" style="flex:1"><label>State</label><input class="search-input" style="width:100%" id="docState"></div>
+      </div>
+      <div class="form-group"><label>Bio</label><input class="search-input" style="width:100%" id="docBio"></div>
+      <div class="filter-row" style="margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="docVerified"> Verified</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="docActive" checked> Active</label>
+      </div>
+      <div class="modal-btns">
+        <button type="button" class="btn" onclick="closeDoctorModal()" style="background:var(--border);color:var(--text)">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Doctor</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- PATIENT FORM MODAL -->
+<div class="modal-overlay" id="patientModal">
+  <div class="modal" style="max-width:520px;max-height:90vh;overflow-y:auto">
+    <h3 id="patientModalTitle">Add Patient</h3>
+    <form id="patientForm" onsubmit="submitPatientForm(event)">
+      <input type="hidden" id="patId">
+      <div class="form-group"><label>Full Name *</label><input class="search-input" style="width:100%" id="patName" required></div>
+      <div class="form-group"><label>Email *</label><input class="search-input" style="width:100%" type="email" id="patEmail" required></div>
+      <div class="form-group" id="patPwdGroup"><label>Password <span id="patPwdHint">*</span></label><input class="search-input" style="width:100%" type="password" id="patPassword"></div>
+      <div class="form-group"><label>Phone</label><input class="search-input" style="width:100%" id="patPhone"></div>
+      <div class="filter-row">
+        <div class="form-group" style="flex:1"><label>Date of Birth</label><input class="search-input" style="width:100%" type="date" id="patDob"></div>
+        <div class="form-group" style="flex:1"><label>Gender</label>
+          <select class="search-input" style="width:100%" id="patGender"><option value="">—</option><option>Male</option><option>Female</option><option>Other</option></select>
+        </div>
+      </div>
+      <div class="filter-row">
+        <div class="form-group" style="flex:1"><label>Blood Group</label><input class="search-input" style="width:100%" id="patBloodGroup"></div>
+        <div class="form-group" style="flex:1"><label>City</label><input class="search-input" style="width:100%" id="patCity"></div>
+      </div>
+      <div class="form-group"><label>Address</label><input class="search-input" style="width:100%" id="patAddress"></div>
+      <div class="filter-row" style="margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="patActive" checked> Active</label>
+      </div>
+      <div class="modal-btns">
+        <button type="button" class="btn" onclick="closePatientModal()" style="background:var(--border);color:var(--text)">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Patient</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- CONFIRM MODAL -->
 <div class="modal-overlay" id="confirmModal">
   <div class="modal">
@@ -465,12 +533,8 @@ async function doLogin(e) {
       state.token = r.token
       state.admin = r.admin
       sessionStorage.setItem('adminToken', r.token)
-      if (r.admin.mustChangePassword) {
-        document.getElementById('loginScreen').style.display = 'none'
-        document.getElementById('changePwdScreen').style.display = 'flex'
-      } else {
-        enterApp()
-      }
+      // Forced password-change prompt disabled per admin requirement — go straight into the dashboard.
+      enterApp()
     } else {
       errDiv.textContent = r.error || 'Login failed'
       errDiv.style.display = 'block'
@@ -613,10 +677,85 @@ function renderDoctors(rows) {
     <td>${d.is_verified ? '<span class="badge badge-blue"><i class="fas fa-check"></i> Verified</span>' : '<span class="badge badge-warn">Unverified</span>'}</td>
     <td>${d.rating ? d.rating.toFixed(1) + ' ⭐' : '—'}</td>
     <td><div class="actions-cell">
+      <button class="btn btn-sm" style="background:var(--border);color:var(--text)" onclick="openDoctorForm(${d.id})"><i class="fas fa-edit"></i></button>
       <button class="btn btn-sm ${d.is_verified ? 'btn-warn' : 'btn-success'}" onclick="toggleVerify(${d.id},${d.is_verified})">${d.is_verified ? 'Unverify' : 'Verify'}</button>
-      <button class="btn btn-sm ${d.is_active ? 'btn-danger' : 'btn-success'}" onclick="toggleDoctorStatus(${d.id},${d.is_active})">${d.is_active ? 'Deactivate' : 'Activate'}</button>
+      <button class="btn btn-sm ${d.is_active ? 'btn-danger' : 'btn-success'}" onclick="toggleDoctorStatus(${d.id},${d.is_active})">${d.is_active ? 'Suspend' : 'Reactivate'}</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteDoctor(${d.id})"><i class="fas fa-trash"></i></button>
     </div></td>
   </tr>`).join('')
+}
+async function deleteDoctor(id) {
+  confirm2('Remove this doctor?', 'This will permanently deactivate and remove the doctor from listings. This cannot be undone.', async () => {
+    const r = await adminFetch(`/api/admin/doctors/${id}`, { method: 'DELETE', body: JSON.stringify({ confirm: 'DELETE' }) })
+    if (r.success) { toast('Doctor removed', 'success'); loadDoctors() }
+    else toast(r.error || 'Failed to remove doctor', 'error')
+  })
+}
+
+// ─── DOCTOR FORM MODAL ───────────────────────────────────────────────────────
+async function openDoctorForm(id) {
+  document.getElementById('doctorForm').reset()
+  document.getElementById('docId').value = ''
+  document.getElementById('docActive').checked = true
+  document.getElementById('docVerified').checked = false
+  if (id) {
+    document.getElementById('doctorModalTitle').textContent = 'Edit Doctor'
+    document.getElementById('docPwdHint').textContent = '(leave blank to keep current)'
+    document.getElementById('docPassword').required = false
+    try {
+      const r = await adminFetch(`/api/admin/doctors/${id}`)
+      if (!r.success) { toast(r.error || 'Failed to load doctor', 'error'); return }
+      const d = r.doctor
+      document.getElementById('docId').value = d.id
+      document.getElementById('docName').value = d.name || ''
+      document.getElementById('docEmail').value = d.email || ''
+      document.getElementById('docPhone').value = d.phone || ''
+      document.getElementById('docSpecialization').value = d.specialization || ''
+      document.getElementById('docExperience').value = d.experience_years || ''
+      document.getElementById('docFee').value = d.consultation_fee || ''
+      document.getElementById('docQualification').value = d.qualification || ''
+      document.getElementById('docHospital').value = d.hospital_name || ''
+      document.getElementById('docCity').value = d.city || ''
+      document.getElementById('docState').value = d.state || ''
+      document.getElementById('docBio').value = d.bio || ''
+      document.getElementById('docVerified').checked = !!d.is_verified
+      document.getElementById('docActive').checked = !!d.is_active
+    } catch { toast('Failed to load doctor', 'error'); return }
+  } else {
+    document.getElementById('doctorModalTitle').textContent = 'Add Doctor'
+    document.getElementById('docPwdHint').textContent = '*'
+    document.getElementById('docPassword').required = true
+  }
+  document.getElementById('doctorModal').classList.add('open')
+}
+function closeDoctorModal() { document.getElementById('doctorModal').classList.remove('open') }
+async function submitDoctorForm(e) {
+  e.preventDefault()
+  const id = document.getElementById('docId').value
+  const payload = {
+    name: document.getElementById('docName').value.trim(),
+    email: document.getElementById('docEmail').value.trim(),
+    phone: document.getElementById('docPhone').value.trim(),
+    specialization: document.getElementById('docSpecialization').value.trim(),
+    experience_years: Number(document.getElementById('docExperience').value) || 0,
+    consultation_fee: Number(document.getElementById('docFee').value) || 0,
+    qualification: document.getElementById('docQualification').value.trim(),
+    hospital_name: document.getElementById('docHospital').value.trim(),
+    city: document.getElementById('docCity').value.trim(),
+    state: document.getElementById('docState').value.trim(),
+    bio: document.getElementById('docBio').value.trim(),
+    is_verified: document.getElementById('docVerified').checked,
+    is_active: document.getElementById('docActive').checked
+  }
+  const pwd = document.getElementById('docPassword').value
+  if (pwd) payload.password = pwd
+  try {
+    const r = id
+      ? await adminFetch(`/api/admin/doctors/${id}`, { method: 'PUT', body: JSON.stringify(payload) })
+      : await adminFetch('/api/admin/doctors', { method: 'POST', body: JSON.stringify(payload) })
+    if (r.success) { toast(id ? 'Doctor updated' : 'Doctor added', 'success'); closeDoctorModal(); loadDoctors(); loadDashboard() }
+    else toast(r.error || 'Save failed', 'error')
+  } catch { toast('Network error', 'error') }
 }
 async function toggleVerify(id, current) {
   const newVal = !current
@@ -651,9 +790,77 @@ async function loadPatients() {
       <td>${esc(p.gender||'—')}</td>
       <td>${p.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Inactive</span>'}</td>
       <td style="font-size:12px;white-space:nowrap">${fmtDate(p.created_at)}</td>
-      <td><button class="btn btn-sm ${p.is_active ? 'btn-danger' : 'btn-success'}" onclick="togglePatientStatus(${p.id},${p.is_active})">${p.is_active ? 'Deactivate' : 'Activate'}</button></td>
+      <td><div class="actions-cell">
+        <button class="btn btn-sm" style="background:var(--border);color:var(--text)" onclick="openPatientForm(${p.id})"><i class="fas fa-edit"></i></button>
+        <button class="btn btn-sm ${p.is_active ? 'btn-danger' : 'btn-success'}" onclick="togglePatientStatus(${p.id},${p.is_active})">${p.is_active ? 'Deactivate' : 'Activate'}</button>
+        <button class="btn btn-sm btn-danger" onclick="deletePatient(${p.id})"><i class="fas fa-trash"></i></button>
+      </div></td>
     </tr>`).join('')
   } catch { document.getElementById('patientsTable').innerHTML = '<tr><td colspan="8" class="empty-state">Failed to load</td></tr>' }
+}
+async function deletePatient(id) {
+  confirm2('Remove this patient?', 'This will permanently delete the patient record. This cannot be undone.', async () => {
+    const r = await adminFetch(`/api/admin/patients/${id}`, { method: 'DELETE', body: JSON.stringify({ confirm: 'DELETE' }) })
+    if (r.success) { toast('Patient removed', 'success'); loadPatients() }
+    else toast(r.error || 'Failed to remove patient', 'error')
+  })
+}
+
+// ─── PATIENT FORM MODAL ──────────────────────────────────────────────────────
+async function openPatientForm(id) {
+  document.getElementById('patientForm').reset()
+  document.getElementById('patId').value = ''
+  document.getElementById('patActive').checked = true
+  if (id) {
+    document.getElementById('patientModalTitle').textContent = 'Edit Patient'
+    document.getElementById('patPwdHint').textContent = '(leave blank to keep current)'
+    document.getElementById('patPassword').required = false
+    try {
+      const r = await adminFetch(`/api/admin/patients/${id}`)
+      if (!r.success) { toast(r.error || 'Failed to load patient', 'error'); return }
+      const p = r.patient
+      document.getElementById('patId').value = p.id
+      document.getElementById('patName').value = p.name || ''
+      document.getElementById('patEmail').value = p.email || ''
+      document.getElementById('patPhone').value = p.phone || ''
+      document.getElementById('patDob').value = p.dob || ''
+      document.getElementById('patGender').value = p.gender || ''
+      document.getElementById('patBloodGroup').value = p.blood_group || ''
+      document.getElementById('patCity').value = p.city || ''
+      document.getElementById('patAddress').value = p.address || ''
+      document.getElementById('patActive').checked = !!p.is_active
+    } catch { toast('Failed to load patient', 'error'); return }
+  } else {
+    document.getElementById('patientModalTitle').textContent = 'Add Patient'
+    document.getElementById('patPwdHint').textContent = '*'
+    document.getElementById('patPassword').required = true
+  }
+  document.getElementById('patientModal').classList.add('open')
+}
+function closePatientModal() { document.getElementById('patientModal').classList.remove('open') }
+async function submitPatientForm(e) {
+  e.preventDefault()
+  const id = document.getElementById('patId').value
+  const payload = {
+    name: document.getElementById('patName').value.trim(),
+    email: document.getElementById('patEmail').value.trim(),
+    phone: document.getElementById('patPhone').value.trim(),
+    dob: document.getElementById('patDob').value,
+    gender: document.getElementById('patGender').value,
+    blood_group: document.getElementById('patBloodGroup').value.trim(),
+    city: document.getElementById('patCity').value.trim(),
+    address: document.getElementById('patAddress').value.trim(),
+    is_active: document.getElementById('patActive').checked
+  }
+  const pwd = document.getElementById('patPassword').value
+  if (pwd) payload.password = pwd
+  try {
+    const r = id
+      ? await adminFetch(`/api/admin/patients/${id}`, { method: 'PUT', body: JSON.stringify(payload) })
+      : await adminFetch('/api/admin/patients', { method: 'POST', body: JSON.stringify(payload) })
+    if (r.success) { toast(id ? 'Patient updated' : 'Patient added', 'success'); closePatientModal(); loadPatients(); loadDashboard() }
+    else toast(r.error || 'Save failed', 'error')
+  } catch { toast('Network error', 'error') }
 }
 let patientDebounce
 function debouncedPatientSearch() { clearTimeout(patientDebounce); patientDebounce = setTimeout(loadPatients, 400) }
@@ -683,8 +890,26 @@ async function loadAppointments() {
       <td style="white-space:nowrap;font-size:12px">${esc(a.appointment_date||'')} ${esc(a.appointment_time||'')}</td>
       <td><span class="badge ${statusBadge(a.status)}">${a.status||'—'}</span></td>
       <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.reason||'—')}</td>
+      <td>
+        <select class="search-input" style="width:130px;font-size:12px" onchange="updateApptStatus(${a.id}, this.value)">
+          <option value="">Change status...</option>
+          <option value="pending" ${a.status==='pending'?'selected':''}>Pending</option>
+          <option value="confirmed" ${a.status==='confirmed'?'selected':''}>Confirmed</option>
+          <option value="completed" ${a.status==='completed'?'selected':''}>Completed</option>
+          <option value="cancelled" ${a.status==='cancelled'?'selected':''}>Cancelled</option>
+          <option value="rejected" ${a.status==='rejected'?'selected':''}>Rejected</option>
+        </select>
+      </td>
     </tr>`).join('')
-  } catch { document.getElementById('appointmentsTable').innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load</td></tr>' }
+  } catch { document.getElementById('appointmentsTable').innerHTML = '<tr><td colspan="8" class="empty-state">Failed to load</td></tr>' }
+}
+async function updateApptStatus(id, status) {
+  if (!status) return
+  try {
+    const r = await adminFetch(`/api/admin/appointments/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) })
+    if (r.success) { toast('Appointment status updated', 'success'); loadAppointments(); loadDashboard() }
+    else toast(r.error || 'Failed to update status', 'error')
+  } catch { toast('Network error', 'error') }
 }
 
 // ─── HOSPITALS ────────────────────────────────────────────────────────────────

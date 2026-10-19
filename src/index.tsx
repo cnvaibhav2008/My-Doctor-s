@@ -2182,6 +2182,194 @@ app.delete('/api/admin/reviews/:id', async (c) => {
   } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
 })
 
+// POST /api/admin/doctors — create a new doctor (admin add)
+app.post('/api/admin/doctors', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  try {
+    const body = await c.req.json()
+    const { name, email, password, phone, specialization, experience_years, qualification,
+      hospital_name, hospital_address, city, state, pincode, consultation_fee, bio,
+      is_verified, is_active } = body
+    if (!name || !email || !password || !specialization) {
+      return c.json({ success: false, error: 'Name, email, password and specialization are required' }, 400)
+    }
+    const existing = await c.env.DB.prepare('SELECT id FROM doctors WHERE email = ?').bind(email).first()
+    if (existing) return c.json({ success: false, error: 'Email already registered' }, 409)
+
+    const userId = generateId('doc')
+    const hashedPwd = hashPassword(password)
+    const result = await c.env.DB.prepare(`
+      INSERT INTO doctors (user_id, name, email, phone, specialization, experience_years, qualification,
+        hospital_name, hospital_address, city, state, pincode, consultation_fee, bio,
+        diseases_treated, sub_specializations, available_days, available_times, languages, is_verified, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      userId + ':' + hashedPwd, name, email, phone || '', specialization,
+      experience_years || 0, qualification || '', hospital_name || '', hospital_address || '',
+      city || '', state || '', pincode || '', consultation_fee || 500, bio || '',
+      JSON.stringify([]), JSON.stringify([]),
+      JSON.stringify(["Mon","Tue","Wed","Thu","Fri"]),
+      JSON.stringify(["09:00","10:00","11:00","14:00","15:00","16:00"]),
+      JSON.stringify(["English"]),
+      is_verified ? 1 : 0, is_active === false ? 0 : 1
+    ).run()
+
+    await auditLog(c.env.DB, session.admin_id, session.email, 'CREATE_DOCTOR', 'doctor', String(result.meta.last_row_id), `Created doctor: ${name} (${email})`, ip)
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// GET /api/admin/doctors/:id — single doctor full detail (for edit form)
+app.get('/api/admin/doctors/:id', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  try {
+    const id = c.req.param('id')
+    const doctor = await c.env.DB.prepare('SELECT id, name, email, phone, specialization, experience_years, qualification, bio, hospital_name, hospital_address, city, state, pincode, consultation_fee, is_verified, is_active, rating, total_ratings, created_at FROM doctors WHERE id = ?').bind(id).first()
+    if (!doctor) return c.json({ success: false, error: 'Doctor not found' }, 404)
+    return c.json({ success: true, doctor })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// PUT /api/admin/doctors/:id — full edit of doctor details (admin)
+app.put('/api/admin/doctors/:id', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  try {
+    const id = c.req.param('id')
+    const body = await c.req.json()
+    const fields = ['name', 'email', 'phone', 'specialization', 'experience_years', 'qualification', 'bio',
+      'hospital_name', 'hospital_address', 'city', 'state', 'pincode', 'consultation_fee', 'is_verified', 'is_active']
+    const updates: string[] = []
+    const values: any[] = []
+    for (const f of fields) {
+      if (body[f] !== undefined) { updates.push(`${f} = ?`); values.push(body[f]) }
+    }
+    if (body.password) {
+      const existing = await c.env.DB.prepare('SELECT user_id FROM doctors WHERE id = ?').bind(id).first() as any
+      const prefix = (existing?.user_id || '').split(':')[0] || generateId('doc')
+      updates.push('user_id = ?')
+      values.push(prefix + ':' + hashPassword(body.password))
+    }
+    if (!updates.length) return c.json({ success: false, error: 'No fields to update' }, 400)
+    values.push(id)
+    await c.env.DB.prepare(`UPDATE doctors SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ?`).bind(...values).run()
+    await auditLog(c.env.DB, session.admin_id, session.email, 'UPDATE_DOCTOR', 'doctor', id, `Updated doctor ${id}`, ip)
+    return c.json({ success: true })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// POST /api/admin/patients — create a new patient (admin add)
+app.post('/api/admin/patients', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  try {
+    const body = await c.req.json()
+    const { name, email, password, phone, dob, gender, blood_group, address, city, state, pincode, is_active } = body
+    if (!name || !email || !password) return c.json({ success: false, error: 'Name, email and password are required' }, 400)
+    const existing = await c.env.DB.prepare('SELECT id FROM patients WHERE email = ?').bind(email).first()
+    if (existing) return c.json({ success: false, error: 'Email already registered' }, 409)
+
+    const userId = generateId('pat')
+    const hashedPwd = hashPassword(password)
+    const result = await c.env.DB.prepare(`
+      INSERT INTO patients (user_id, name, email, phone, dob, gender, blood_group, address, city, state, pincode, medical_history, allergies, current_medications, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      userId + ':' + hashedPwd, name, email, phone || '', dob || '', gender || '',
+      blood_group || '', address || '', city || '', state || '', pincode || '',
+      JSON.stringify([]), JSON.stringify([]), JSON.stringify([]), is_active === false ? 0 : 1
+    ).run()
+
+    await auditLog(c.env.DB, session.admin_id, session.email, 'CREATE_PATIENT', 'patient', String(result.meta.last_row_id), `Created patient: ${name} (${email})`, ip)
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// GET /api/admin/patients/:id — single patient full detail (for edit form)
+app.get('/api/admin/patients/:id', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  try {
+    const id = c.req.param('id')
+    const patient = await c.env.DB.prepare('SELECT id, name, email, phone, dob, gender, blood_group, address, city, state, pincode, is_active, created_at FROM patients WHERE id = ?').bind(id).first()
+    if (!patient) return c.json({ success: false, error: 'Patient not found' }, 404)
+    return c.json({ success: true, patient })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// PUT /api/admin/patients/:id — full edit of patient details (admin)
+app.put('/api/admin/patients/:id', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  try {
+    const id = c.req.param('id')
+    const body = await c.req.json()
+    const fields = ['name', 'email', 'phone', 'dob', 'gender', 'blood_group', 'address', 'city', 'state', 'pincode', 'is_active']
+    const updates: string[] = []
+    const values: any[] = []
+    for (const f of fields) {
+      if (body[f] !== undefined) { updates.push(`${f} = ?`); values.push(body[f]) }
+    }
+    if (body.password) {
+      const existing = await c.env.DB.prepare('SELECT user_id FROM patients WHERE id = ?').bind(id).first() as any
+      const prefix = (existing?.user_id || '').split(':')[0] || generateId('pat')
+      updates.push('user_id = ?')
+      values.push(prefix + ':' + hashPassword(body.password))
+    }
+    if (!updates.length) return c.json({ success: false, error: 'No fields to update' }, 400)
+    values.push(id)
+    await c.env.DB.prepare(`UPDATE patients SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ?`).bind(...values).run()
+    await auditLog(c.env.DB, session.admin_id, session.email, 'UPDATE_PATIENT', 'patient', id, `Updated patient ${id}`, ip)
+    return c.json({ success: true })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// DELETE /api/admin/patients/:id — permanently remove patient
+app.delete('/api/admin/patients/:id', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  try {
+    const id = c.req.param('id')
+    const { confirm } = await c.req.json().catch(() => ({ confirm: '' }))
+    if (confirm !== 'DELETE') return c.json({ success: false, error: 'Confirmation required: send confirm: "DELETE"' }, 400)
+    const pat = await c.env.DB.prepare('SELECT name, email FROM patients WHERE id = ?').bind(id).first() as any
+    await c.env.DB.prepare('DELETE FROM patients WHERE id = ?').bind(id).run()
+    await auditLog(c.env.DB, session.admin_id, session.email, 'DELETE_PATIENT', 'patient', id, `Deleted patient: ${pat?.name} (${pat?.email})`, ip)
+    return c.json({ success: true })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
+// PUT /api/admin/appointments/:id/status — admin override of appointment status
+app.put('/api/admin/appointments/:id/status', async (c) => {
+  const token = c.req.header('X-Admin-Token') || ''
+  const session = await getAdminSession(c.env.DB, token)
+  if (!session) return c.json({ success: false, error: 'Unauthorized' }, 401)
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  try {
+    const id = c.req.param('id')
+    const { status } = await c.req.json()
+    const allowed = ['pending', 'confirmed', 'completed', 'cancelled', 'rejected']
+    if (!allowed.includes(status)) return c.json({ success: false, error: 'Invalid status' }, 400)
+    await c.env.DB.prepare(`UPDATE appointments SET status = ?, updated_at = datetime('now') WHERE id = ?`).bind(status, id).run()
+    await auditLog(c.env.DB, session.admin_id, session.email, 'UPDATE_APPOINTMENT', 'appointment', id, `Status set to ${status}`, ip)
+    return c.json({ success: true })
+  } catch (e: any) { return c.json({ success: false, error: e.message }, 500) }
+})
+
 // GET /api/admin/me — verify session and return admin info
 app.get('/api/admin/me', async (c) => {
   const token = c.req.header('X-Admin-Token') || ''
