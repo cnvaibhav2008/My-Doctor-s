@@ -2588,6 +2588,23 @@ app.get('*', (c) => {
     </div>
   </section>
 
+  <!-- RECENT REPORTS & HEALTH UPDATES (PhonePe-style recent activity, patient-only) -->
+  <section class="recent-reports-section" id="recentReportsSection" style="display:none">
+    <div class="container">
+      <div class="recent-reports-header">
+        <div>
+          <div class="section-badge"><i class="fas fa-file-medical-alt"></i> Health Updates</div>
+          <h2 class="recent-reports-title">Recent Reports <span class="gradient-text">&amp; Health Updates</span></h2>
+          <p class="recent-reports-sub">Your latest prescriptions, lab reports and scan results — all in one place</p>
+        </div>
+        <button class="btn-view-all" onclick="showPage('reports')"><i class="fas fa-arrow-right"></i> View All</button>
+      </div>
+      <div id="recentReportsList" class="recent-reports-list">
+        <div class="loading-state" style="padding:30px 20px"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </section>
+
   <!-- STATS -->
   <section class="stats-section">
     <div class="container">

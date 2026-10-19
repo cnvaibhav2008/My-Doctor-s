@@ -328,6 +328,7 @@ async function logout() {
   $('userActions').style.display = 'none';
   $('userDropdown').classList.remove('open');
   if ($('welcomeStrip')) $('welcomeStrip').style.display = 'none';
+  if ($('recentReportsSection')) $('recentReportsSection').style.display = 'none';
   updateMobileWelcome(null);
   showToast('Logged out successfully', 'info');
   showPage('home');
@@ -339,6 +340,8 @@ function updateNavForUser(user) {
   $('userActions').style.display = '';
   $('dropUserName').textContent = user.name;
   $('dropUserType').textContent = user.type === 'doctor' ? `Dr. ${user.specialization || 'Doctor'}` : 'Patient';
+  if (user.type === 'patient') loadRecentReportsHome();
+  else if ($('recentReportsSection')) $('recentReportsSection').style.display = 'none';
   if (user.profile_image) {
     $('userAvatarImg').src = user.profile_image;
     $('userAvatarImg').style.display = '';
@@ -372,6 +375,68 @@ function updateWelcomeStrip(user) {
 
 function toggleUserMenu() {
   $('userDropdown').classList.toggle('open');
+}
+
+// ─── RECENT REPORTS & HEALTH UPDATES (home page, patient-only) ─────────
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+async function loadRecentReportsHome() {
+  const section = $('recentReportsSection');
+  const list = $('recentReportsList');
+  if (!section || !list) return;
+  // Strict patient-only + session check — never show another user's data
+  if (!state.currentUser || state.currentUser.type !== 'patient' || !state.sessionToken) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  try {
+    const res = await apiCall('/api/reports');
+    if (!res.ok) {
+      list.innerHTML = `<div class="rr-empty"><i class="fas fa-exclamation-triangle"></i><p>Could not load your recent reports right now.</p></div>`;
+      return;
+    }
+    const reports = (res.data.reports || [])
+      .slice()
+      .sort((a, b) => new Date(b.report_date || b.created_at) - new Date(a.report_date || a.created_at))
+      .slice(0, 5);
+
+    if (!reports.length) {
+      list.innerHTML = `<div class="rr-empty"><i class="fas fa-file-medical-alt"></i><p>No reports yet. Prescriptions and lab reports from your doctor or hospital will show up here automatically.</p></div>`;
+      return;
+    }
+
+    list.innerHTML = reports.map(r => {
+      const status = (r.status || 'completed').toLowerCase();
+      const source = r.lab_name ? r.lab_name : (r.doctor_name ? `Dr. ${r.doctor_name}` : 'MyDoctor\'s');
+      const dateStr = formatDate(r.report_date || r.created_at);
+      const icon = getReportIcon(r.report_type);
+      const canOpen = !!r.file_url;
+      const inner = `
+        <div class="rr-icon ${escapeHtml(r.report_type || '')}"><i class="fas ${icon}"></i></div>
+        <div class="rr-body">
+          <div class="rr-title-row">
+            <span class="rr-title">${escapeHtml(r.report_title || 'Medical Report')}</span>
+            ${r.is_critical ? '<span class="critical-badge">⚠️ Critical</span>' : ''}
+          </div>
+          <div class="rr-meta">
+            <span><i class="fas fa-hospital"></i> ${escapeHtml(source)}</span>
+            <span><i class="fas fa-calendar"></i> ${dateStr}</span>
+          </div>
+        </div>
+        <span class="rr-status ${escapeHtml(status)}">${escapeHtml(status)}</span>
+        ${canOpen ? '<span class="rr-action"><i class="fas fa-download" style="color:var(--primary)"></i></span>' : ''}
+      `;
+      return canOpen
+        ? `<a class="recent-report-item ${r.is_critical ? 'rr-critical' : ''}" href="${encodeURI(r.file_url)}" target="_blank" rel="noopener noreferrer" title="Open/download your report securely">${inner}</a>`
+        : `<div class="recent-report-item ${r.is_critical ? 'rr-critical' : ''}">${inner}</div>`;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="rr-empty"><i class="fas fa-exclamation-triangle"></i><p>Error loading recent reports.</p></div>`;
+  }
 }
 
 document.addEventListener('click', (e) => {
@@ -2423,8 +2488,9 @@ async function submitPatientReport() {
   const res = await apiCall('/api/reports', { method: 'POST', body: JSON.stringify(body) });
   if (res.ok && res.data.success) {
     showToast('Report saved! ✅', 'success');
-    // Refresh dashboard
+    // Refresh dashboard and home "Recent Reports" section
     loadDashboard();
+    loadRecentReportsHome();
   } else {
     showToast(res.data.error || 'Save failed', 'error');
   }
@@ -2433,7 +2499,7 @@ async function submitPatientReport() {
 async function deleteReport(id) {
   if (!confirm('Delete this report?')) return;
   const res = await apiCall('/api/reports/' + id, { method: 'DELETE' });
-  if (res.ok) { showToast('Report deleted', 'info'); loadDashboard(); }
+  if (res.ok) { showToast('Report deleted', 'info'); loadDashboard(); loadRecentReportsHome(); }
 }
 
 // ─── PRESCRIPTION HELPERS ─────────────────────────────
@@ -3039,4 +3105,5 @@ async function deleteReport(id) {
   if (!confirm('Delete this record?')) return;
   await apiCall(`/api/reports/${id}`, { method: 'DELETE' });
   loadReports();
+  loadRecentReportsHome();
 }
