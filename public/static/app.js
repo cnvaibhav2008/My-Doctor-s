@@ -1435,25 +1435,44 @@ function renderAppointments(appointments, isDoctor) {
   if (appointments.length === 0) {
     return '<div class="empty-state"><i class="fas fa-calendar-times"></i><h3>No appointments</h3><p>Book your first appointment to get started</p></div>';
   }
-  return appointments.map(a => `
+  return appointments.map(a => {
+    const statusLabel = a.status === 'rejected' ? 'Declined' : a.status;
+    // Doctor action buttons for pending requests
+    let actionBtns = '';
+    if (isDoctor && a.status === 'pending') {
+      actionBtns = `
+        <button class="btn-xs btn-success" onclick="acceptAppointment(${a.id})" title="Accept"><i class="fas fa-check"></i> Accept</button>
+        <button class="btn-xs btn-danger" onclick="rejectAppointment(${a.id})" title="Decline"><i class="fas fa-times"></i> Decline</button>`;
+    } else if (isDoctor && a.status === 'confirmed') {
+      actionBtns = `<button class="btn-xs btn-success" onclick="markCompleted(${a.id})">✓ Done</button>`;
+    } else if (!isDoctor && (a.status === 'confirmed' || a.status === 'pending')) {
+      actionBtns = `<button class="btn-cancel-appt" onclick="cancelAppointment(${a.id})"><i class="fas fa-times"></i> Cancel</button>`;
+    }
+    // Patient-facing pending info note
+    const pendingNote = (!isDoctor && a.status === 'pending')
+      ? `<div class="appt-pending-note"><i class="fas fa-hourglass-half"></i> Awaiting doctor confirmation</div>` : '';
+    const rejectedNote = (!isDoctor && a.status === 'rejected')
+      ? `<div class="appt-rejected-note"><i class="fas fa-times-circle"></i> Doctor declined this request</div>` : '';
+    return `
     <div class="appointment-card">
       <div>
         <div class="appt-doctor-name">${isDoctor ? a.patient_name : a.doctor_name || 'Doctor'}</div>
-        <div class="appt-spec">${isDoctor ? `Patient` : a.specialization || ''}</div>
+        <div class="appt-spec">${isDoctor ? 'Patient' : a.specialization || ''}</div>
         <div class="appt-hospital"><i class="fas fa-hospital"></i> ${a.hospital_name || ''}</div>
         <div class="appt-details">
           <div class="appt-detail"><i class="fas fa-calendar"></i> ${formatDate(a.appointment_date)}</div>
           <div class="appt-detail"><i class="fas fa-clock"></i> ${a.appointment_time}</div>
           ${a.reason ? `<div class="appt-detail"><i class="fas fa-comment"></i> ${a.reason}</div>` : ''}
         </div>
+        ${pendingNote}${rejectedNote}
         <div class="appt-id">Booking ID: ${a.appointment_id}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px">
-        <span class="appt-status status-${a.status}">${a.status}</span>
-        ${a.status === 'confirmed' || a.status === 'pending' ? `<button class="btn-cancel-appt" onclick="cancelAppointment(${a.id})"><i class="fas fa-times"></i> Cancel</button>` : ''}
+        <span class="appt-status status-${a.status}">${statusLabel}</span>
+        <div style="display:flex;flex-direction:column;gap:6px">${actionBtns}</div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 async function cancelAppointment(id) {
@@ -1465,7 +1484,34 @@ async function cancelAppointment(id) {
     showToast('Appointment cancelled', 'info');
     loadAppointments();
   } else {
-    showToast('Failed to cancel appointment', 'error');
+    showToast(res.data?.error || 'Failed to cancel appointment', 'error');
+  }
+}
+
+async function acceptAppointment(id) {
+  const res = await apiCall(`/api/appointments/${id}/status`, {
+    method: 'PUT', body: JSON.stringify({ status: 'confirmed' })
+  });
+  if (res.ok && res.data.success) {
+    showToast('Appointment confirmed ✅', 'success');
+    loadAppointments();
+    loadDashboard();
+  } else {
+    showToast(res.data?.error || 'Failed to confirm appointment', 'error');
+  }
+}
+
+async function rejectAppointment(id) {
+  if (!confirm('Decline this appointment request?')) return;
+  const res = await apiCall(`/api/appointments/${id}/status`, {
+    method: 'PUT', body: JSON.stringify({ status: 'rejected' })
+  });
+  if (res.ok && res.data.success) {
+    showToast('Appointment request declined', 'info');
+    loadAppointments();
+    loadDashboard();
+  } else {
+    showToast(res.data?.error || 'Failed to decline appointment', 'error');
   }
 }
 
@@ -1559,7 +1605,7 @@ async function confirmBooking() {
 
   if (res.ok && res.data.success) {
     closeModal('bookingModal');
-    showToast(`Appointment confirmed for ${formatDate(date)} at ${state.selectedTime} ✅`, 'success', 5000);
+    showToast(`Appointment request sent for ${formatDate(date)} at ${state.selectedTime} ⏳ Awaiting doctor confirmation.`, 'info', 6000);
     $('bookingReason').value = '';
     $('bookingSymptoms').value = '';
   } else {
@@ -1625,7 +1671,10 @@ async function loadDashboard() {
                 ${a.reason ? `<div style="color:var(--lighter);font-size:0.78rem">${a.reason}</div>` : ''}
               </div>
               <div style="display:flex;gap:8px;align-items:center">
-                <span class="appt-status status-${a.status}">${a.status}</span>
+                <span class="appt-status status-${a.status}">${a.status === 'rejected' ? 'Declined' : a.status}</span>
+                ${a.status === 'pending' ? `
+                  <button class="btn-xs btn-success" onclick="acceptAppointment(${a.id})" title="Accept"><i class="fas fa-check"></i> Accept</button>
+                  <button class="btn-xs btn-danger" onclick="rejectAppointment(${a.id})" title="Decline"><i class="fas fa-times"></i> Decline</button>` : ''}
                 ${a.status === 'confirmed' ? `<button class="btn-xs btn-success" onclick="markCompleted(${a.id})">✓ Done</button>` : ''}
               </div>
             </div>`).join('')}

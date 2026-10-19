@@ -574,7 +574,7 @@ app.post('/api/auth/register/patient', async (c) => {
     `).bind(
       userId + ':' + hashedPwd, name, email, phone || '', dob || '', gender || '',
       blood_group || '', address || '', city || '', state || '', pincode || '',
-      JSON.stringify([]), JSON.stringify([]), JSON.stringify([]), 1
+      JSON.stringify([]), JSON.stringify([]), JSON.stringify([])
     ).run()
 
     const patient = await c.env.DB.prepare('SELECT * FROM patients WHERE email = ?').bind(email).first() as any
@@ -1138,14 +1138,14 @@ app.post('/api/appointments/book', async (c) => {
 
     await c.env.DB.prepare(`
       INSERT INTO appointments (appointment_id, doctor_id, patient_id, appointment_date, appointment_time, reason, symptoms, predicted_disease, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     `).bind(
       appointmentId, doctor_id, session.user_id, appointment_date, appointment_time,
       reason || '', JSON.stringify(symptoms || []), predicted_disease || ''
     ).run()
 
     const appointment = await c.env.DB.prepare('SELECT * FROM appointments WHERE appointment_id = ?').bind(appointmentId).first()
-    return c.json({ success: true, appointment, message: 'Appointment booked successfully!' })
+    return c.json({ success: true, appointment, message: 'Appointment request sent! Awaiting doctor confirmation.' })
   } catch (e: any) {
     return c.json({ success: false, error: e.message }, 500)
   }
@@ -1200,11 +1200,34 @@ app.put('/api/appointments/:id/status', async (c) => {
     const id = c.req.param('id')
     const { status, notes, prescription } = await c.req.json()
 
+    // Fetch the appointment to enforce role-based status transitions
+    const appt = await c.env.DB.prepare('SELECT * FROM appointments WHERE id = ?').bind(id).first() as any
+    if (!appt) return c.json({ success: false, error: 'Appointment not found' }, 404)
+
+    if (session.user_type === 'patient') {
+      // Patients may only cancel their own appointments
+      if (String(appt.patient_id) !== String(session.user_id)) return c.json({ success: false, error: 'Unauthorized' }, 403)
+      if (status !== 'cancelled') return c.json({ success: false, error: 'Patients can only cancel appointments' }, 403)
+    } else if (session.user_type === 'doctor') {
+      // Doctors may accept (confirmed), reject, or complete their own appointments
+      if (String(appt.doctor_id) !== String(session.user_id)) return c.json({ success: false, error: 'Unauthorized' }, 403)
+      const allowed = ['confirmed', 'rejected', 'completed', 'cancelled']
+      if (!allowed.includes(status)) return c.json({ success: false, error: 'Invalid status transition' }, 400)
+    } else {
+      return c.json({ success: false, error: 'Unauthorized' }, 403)
+    }
+
     await c.env.DB.prepare(
       `UPDATE appointments SET status = ?, notes = ?, prescription = ?, updated_at = datetime('now') WHERE id = ?`
     ).bind(status, notes || '', prescription || '', id).run()
 
-    return c.json({ success: true, message: 'Appointment updated' })
+    // Return updated appointment with notification hint for the patient
+    const updated = await c.env.DB.prepare('SELECT * FROM appointments WHERE id = ?').bind(id).first()
+    const notifyMsg = status === 'confirmed' ? 'Appointment confirmed by doctor!'
+      : status === 'rejected' ? 'Appointment request was declined by the doctor.'
+      : status === 'completed' ? 'Appointment marked as completed.'
+      : 'Appointment cancelled.'
+    return c.json({ success: true, message: notifyMsg, appointment: updated })
   } catch (e: any) {
     return c.json({ success: false, error: e.message }, 500)
   }

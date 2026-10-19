@@ -750,6 +750,12 @@ ul { list-style: none; }
 [data-theme="dark"] .status-pending { background: rgba(217,119,6,0.15); color: #FBBF24; }
 [data-theme="dark"] .status-cancelled { background: rgba(220,38,38,0.15); color: #FF8080; }
 [data-theme="dark"] .status-completed { background: rgba(0,102,255,0.15); color: var(--primary); }
+.status-rejected { background: #FEE2E2; color: #DC2626; }
+[data-theme="dark"] .status-rejected { background: rgba(220,38,38,0.15); color: #FF8080; }
+.appt-pending-note { font-size: 0.78rem; color: #D97706; margin-top: 6px; display: flex; align-items: center; gap: 5px; }
+.appt-rejected-note { font-size: 0.78rem; color: #DC2626; margin-top: 6px; display: flex; align-items: center; gap: 5px; }
+[data-theme="dark"] .appt-pending-note { color: #FBBF24; }
+[data-theme="dark"] .appt-rejected-note { color: #FF8080; }
 .appt-id { font-size: 0.7rem; color: var(--lighter); margin-top: 5px; font-family: monospace; }
 .btn-cancel-appt { padding: 7px 14px; background: #FEE2E2; color: #DC2626; border-radius: 8px; font-size: 0.78rem; font-weight: 600; transition: var(--transition); }
 .btn-cancel-appt:hover { background: #DC2626; color: white; }
@@ -1087,6 +1093,9 @@ ul { list-style: none; }
 .btn-success { background: #DCFCE7; color: #16A34A; padding: 4px 11px; border-radius: 7px; font-size: 0.73rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; }
 .btn-success:hover { background: #16A34A; color: white; }
 [data-theme="dark"] .btn-success { background: rgba(22,163,74,0.15); color: #34D399; }
+.btn-danger { background: #FEE2E2; color: #DC2626; }
+.btn-danger:hover { background: #DC2626; color: white; }
+[data-theme="dark"] .btn-danger { background: rgba(220,38,38,0.15); color: #FF8080; }
 
 /* ═══════════════════════════════════════════════════════
    CRITICAL ALERT BANNER
