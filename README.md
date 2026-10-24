@@ -5,11 +5,6 @@
 
 ---
 
-## 🌐 Live URL
-**Sandbox**: https://3000-i34vcpfsnfv6yey4pxffq-5c13a017.sandbox.novita.ai
-
----
-
 ## ✅ Completed Features
 
 ### 👤 Dual Profile System
