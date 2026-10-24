@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🏥 MyDoctor's — Professional Medical Platform
 
 ## Project Overview
@@ -150,3 +151,6 @@ npm run db:migrate:local
 ---
 
 **Built with ❤️ for better healthcare access across India**
+=======
+# My-Doctor-s
+>>>>>>> origin/main
